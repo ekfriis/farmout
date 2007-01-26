@@ -144,7 +144,7 @@ EOF
 #
 # Submit the job
 #
-    echo condor_submit $consub
+    condor_submit $consub
 done
 
 echo -n "Jobs for $jobName are created in "
