@@ -1,0 +1,152 @@
+#!/bin/bash
+#
+# Setup:
+
+#
+# Usage:
+#       farmoutRandomSeedJobs <jobName> <nEvents> <nEventsPerJob> <CMSSW Version> <config file>
+#       Expects a cfi called IOMC/GeneratorInterface/data/PythiaSource<jobName>.cfi to exist
+#       in the CMSSW area that you are using.
+#  Example: farmoutCmsRunJobs blah 1000000 100 ~/CMSSW_1_2_0 /path/to/my.cfg
+#
+# The config file may refer to the following macros, which are automatically
+# inserted by this script:
+#
+# $randomNumber
+# $randomNumber2
+# $nEventsPerJob
+# $outputFileName
+#
+# Job parameters
+#
+jobName=$1
+declare -i nEvents=$2
+declare -i nEventsPerJob=$3
+CMSSW_HOME=`realpath $4`
+configTemplate=`realpath $5`
+
+#       Ensure that your environment is correct
+
+SRM_BASE_OUTPUT_DIR=srm://cmssrm.hep.wisc.edu:8443//pnfs/hep.wisc.edu/data5/uscms01/$USER
+
+if ! [ -d "$CMSSW_HOME" ]; then
+  echo "No such directory: $CMSSW_HOME"
+  exit 1
+fi
+
+# Check the config template
+
+for macro in \$randomNumber \$nEventsPerJob \$outputFileName; do
+  if ! grep -F -q $macro $configTemplate; then
+    echo "$macro must appear on the configuration template.  I can't find it in $configTemplate"
+    exit 1
+  fi
+done
+
+#
+# Environment setup
+#
+#source /afs/hep.wisc.edu/cms/sw/osg0.4.1/setup.sh
+originalDir=`pwd`
+PATH=$PATH:$originalDir
+export PATH
+cd $CMSSW_HOME
+eval `scramv1 runtime -sh`
+
+if [ "$?" != "0" ]; then
+  echo "Failed to initialize CMSSW environment with scram in $CMSSW_HOME."
+  exit 1
+fi
+
+scratch_dir="/data"
+if ! [ -d $scratch_dir ]; then
+  scratch_dir="/scratch"
+fi
+if ! [ -d $scratch_dir ]; then
+  scratch_dir="/tmp"
+fi
+
+runDir=$scratch_dir/$USER/$jobName
+
+mkdir -p $runDir
+cd $runDir
+#fs setacl -dir $runDir -acl condor-hosts rlidwk # commented out if we're not submitting to afs
+SRM_OUTPUT_DIR=$SRM_BASE_OUTPUT_DIR/`basename $runDir`
+#
+# Job specification
+#
+Executable=`which cmsRun.sh`
+#
+# Starting values for the job loop
+#
+declare -i nEventsSubmitted=0
+declare -i job=0
+#
+# Loop over jobs
+#
+while (( $nEvents > $nEventsSubmitted )); do
+#
+# Name the files
+#
+    jobtag=`echo $jobName $job | awk '{printf("%s-%4.4d", $1, $2)}'`
+    consub=`echo $jobName $job | awk '{printf("%s-%4.4d.sub", $1, $2)}'`
+    conlog=`echo $jobName $job | awk '{printf("%s-%4.4d.log", $1, $2)}'`
+    stdout=`echo $jobName $job | awk '{printf("%s-%4.4d.out", $1, $2)}'`
+    stderr=`echo $jobName $job | awk '{printf("%s-%4.4d.err", $1, $2)}'`
+    jobcfg=`echo $jobName $job | awk '{printf("%s-%4.4d.cfg", $1, $2)}'`
+    outputFileName=`echo $jobName $job | awk '{printf("%s-%4.4d.root", $1, $2)}'`
+    randomNumber=`date +%N%S | cut -c 1-6,10-`
+    randomNumber2=`date +%N%S | cut -c 2-6,9-`
+#
+# Create and set to the job subdirectory
+#
+    cd $runDir
+    mkdir -p $jobtag
+    cd $jobtag
+#
+# Prepare job configuration file
+#
+
+sed "s|\\\$randomNumber|$randomNumber|g" < $configTemplate |
+sed "s|\\\$randomNumber2|$randomNumber2|g" |
+sed "s|\\\$nEventsPerJob|$nEventsPerJob|g" |
+sed "s|\\\$outputFileName|$outputFileName|g" > $jobcfg
+
+#
+# Prepare condor submit file for the job
+#
+    cat <<EOF > $consub
+X509UserProxy        = /tmp/x509up_u$UID
+Universe             = vanilla
+Executable           = $Executable
+Arguments            = $jobcfg `basename $outputFileName` $SRM_OUTPUT_DIR
+GetEnv               = true
+Transfer_Input_Files = $jobcfg
+output               = $stdout
+error                = $stderr
+Log                  = $conlog
+Copy_To_Spool        = false
+Notification         = never
+WhenToTransferOutput = On_Exit
+on_exit_remove       = (ExitBySignal == FALSE && ExitStatus == 0)
+Requirements = TARGET.HasAFS =!= FALSE && (TARGET.Site =?= "HEP" || TARGET.IsC2Cluster || TARGET.IsPCluster)
+Queue
+EOF
+#
+# Prepare for the next job
+#
+    let nEventsSubmitted=$nEventsSubmitted+$nEventsPerJob
+    if (( $nEventsSubmitted < $nEvents )); then
+	let job=$job+1
+    else
+	echo "$nEventsSubmitted >= $nEvents done!"
+    fi
+#
+# Submit the job
+#
+    echo condor_submit $consub
+done
+
+echo -n "Jobs for $jobName are created in "
+pwd
+cd $originalDir
