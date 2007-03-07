@@ -1,0 +1,132 @@
+#!/bin/bash
+#
+# Setup:
+
+#
+# Usage:
+#       farmoutAnalysisJobs <jobName> <CMSSW Version> <config file>
+#
+# The config file should refer to the following macros, which are automatically
+# inserted by this script:
+#
+# $inputFileName      ==>  Will be replaced by one of the files in the dataset location
+# $outputFileName     ==>  Will be replaced by the $inputFileName-output.root
+#
+# Job parameters
+#
+jobName=$1
+CMSSW_HOME=`realpath $2`
+configTemplate=`realpath $3`
+
+#       Ensure that your environment is correct
+
+runName=`basename $configTemplate .cfg`
+PNFS_DIR=/pnfs/hep.wisc.edu/data5/uscms01/$USER/$jobName
+DCAP_BASE_DIR=dcap://cmsdcap.hep.wisc.edu:22125/$PNFS_DIR
+SRM_BASE_DIR=srm://cmssrm.hep.wisc.edu:8443/$PNFS_DIR
+SRM_OUTPUT_DIR=${SRM_BASE_DIR}/$runName
+
+if ! [ -d "$CMSSW_HOME" ]; then
+  echo "No such directory: $CMSSW_HOME"
+  exit 1
+fi
+
+# Check the config template
+
+for macro in \$inputFileName \$outputFileName; do
+  if ! grep -F -q $macro $configTemplate; then
+    echo "$macro must appear on the configuration template.  I can't find it in $configTemplate"
+    exit 1
+  fi
+done
+
+#
+# Environment setup
+#
+#source /afs/hep.wisc.edu/cms/sw/osg0.4.1/setup.sh
+originalDir=`pwd`
+PATH=$PATH:$originalDir
+export PATH
+cd $CMSSW_HOME
+eval `scramv1 runtime -sh`
+
+if [ "$?" != "0" ]; then
+  echo "Failed to initialize CMSSW environment with scram in $CMSSW_HOME."
+  exit 1
+fi
+
+scratch_dir="/data"
+if ! [ -d $scratch_dir ]; then
+  scratch_dir="/scratch"
+fi
+if ! [ -d $scratch_dir ]; then
+  scratch_dir="/tmp"
+fi
+
+runDir=$scratch_dir/$USER/$jobName-$runName
+
+mkdir -p $runDir
+cd $runDir
+
+#
+# Job specification
+#
+Executable=`which cmsRun.sh`
+#
+# Loop over input files
+#
+for inputFile in $PNFS_DIR/*.root
+do
+#
+# Name the files
+#
+    jobtag=$runName-`basename $inputFile .root`
+    consub=$jobtag.sub
+    conlog=$jobtag.log
+    stdout=$jobtag.out
+    stderr=$jobtag.err
+    jobcfg=$jobtag.cfg
+    inputFileName=$DCAP_BASE_DIR/`basename $inputFile`
+    outputFileName=$jobtag.root
+#
+# Create and set to the job subdirectory
+#
+    cd $runDir
+    mkdir -p $jobtag
+    cd $jobtag
+#
+# Prepare job configuration file
+#
+
+sed "s|\\\$inputFileName|$inputFileName|g" < $configTemplate |
+sed "s|\\\$outputFileName|$outputFileName|g" > $jobcfg
+
+#
+# Prepare condor submit file for the job
+#
+    cat <<EOF > $consub
+X509UserProxy        = /tmp/x509up_u$UID
+Universe             = vanilla
+Executable           = $Executable
+Arguments            = $jobcfg `basename $outputFileName` $SRM_OUTPUT_DIR
+GetEnv               = true
+Transfer_Input_Files = $jobcfg
+output               = $stdout
+error                = $stderr
+Log                  = $conlog
+Copy_To_Spool        = false
+Notification         = never
+WhenToTransferOutput = On_Exit
+on_exit_remove       = (ExitBySignal == FALSE && ExitStatus == 0)
+Requirements = TARGET.HasAFS =!= FALSE && (TARGET.Site =?= "HEP" || TARGET.IsC2Cluster || TARGET.IsPCluster)
+Queue
+EOF
+#
+# Submit the job
+#
+    condor_submit $consub
+done
+
+echo -n "Jobs for $jobName are created in "
+pwd
+cd $originalDir
