@@ -14,6 +14,52 @@
 #
 # Job parameters
 #
+
+PNFS_HOME=/pnfs/hep.wisc.edu/data5/uscms01/$USER
+SRM_SERVER=srm://cmssrm.hep.wisc.edu:8443
+SRM_HOME=${SRM_SERVER}/${PNFS_HOME}
+
+PrintUsage() {
+  echo "USAGE: farmoutAnalysisJobs [options] <jobName> <CMSSW Version> <config file>"
+  echo ""
+  echo "OPTIONS:"
+  echo "  --output-dir=${SRM_HOME}/"
+  echo "  --no-submit"
+  echo "  --job-limit=N    (limit the number of jobs that are created)"
+  exit 2
+}
+
+basename() {
+  # This shell function is faster than calling /bin/basename
+  path=$1
+  suffix=$2
+  path=${path##*/}  # get everything after the final '/'
+  if [ ! -z $suffix ]; then
+    path=${path%$suffix}
+  fi
+  echo $path
+}
+
+OPTS=`getopt -o "h" -l "help,no-submit,job-limit:" -- "$@"`
+if [ $? -ne 0 ]; then PrintUsage; fi
+
+eval set -- "$OPTS"
+
+while [ ! -z "$1" ]
+do
+  case "$1" in
+    -h) PrintUsage;;
+    --help) PrintUsage;;
+    --no-submit) NO_SUBMIT=1;;
+    --job-limit) shift; JOB_LIMIT=$1;;
+    --) shift; break;;
+    *) echo "Unexpected option $1"; PrintUsage;;
+  esac
+  shift
+done
+
+if [ -z "$1" ]; then PrintUsage; fi
+
 jobName=$1
 CMSSW_HOME=`realpath $2`
 configTemplate=`realpath $3`
@@ -21,9 +67,9 @@ configTemplate=`realpath $3`
 #       Ensure that your environment is correct
 
 runName=`basename $configTemplate .cfg`
-PNFS_DIR=/pnfs/hep.wisc.edu/data5/uscms01/$USER/$jobName
+PNFS_DIR=${PNFS_HOME}/$jobName
 DCAP_BASE_DIR=dcap://cmsdcap.hep.wisc.edu:22125/$PNFS_DIR
-SRM_BASE_DIR=srm://cmssrm.hep.wisc.edu:8443/$PNFS_DIR
+SRM_BASE_DIR=${SRM_SERVER}/$PNFS_DIR
 SRM_OUTPUT_DIR=${SRM_BASE_DIR}/$runName
 
 if ! [ -d "$CMSSW_HOME" ]; then
@@ -64,6 +110,7 @@ if ! [ -d $scratch_dir ]; then
 fi
 
 runDir=$scratch_dir/$USER/$jobName-$runName
+submitFile=$runDir/submit
 
 mkdir -p $runDir
 cd $runDir
@@ -72,11 +119,31 @@ cd $runDir
 # Job specification
 #
 Executable=`which cmsRun.sh`
+
+    cat <<EOF > $submitFile
+X509UserProxy        = /tmp/x509up_u$UID
+Universe             = vanilla
+Executable           = $Executable
+GetEnv               = true
+Copy_To_Spool        = false
+Notification         = never
+WhenToTransferOutput = On_Exit
+on_exit_remove       = (ExitBySignal == FALSE && ExitStatus == 0)
+Requirements = TARGET.HasAFS =?= True || TARGET.IsC2Cluster || TARGET.IsPCluster
+EOF
+
 #
 # Loop over input files
 #
+count=0
 for inputFile in $PNFS_DIR/*.root
 do
+    count=$(($count+1))
+    if [ ! -z $JOB_LIMIT ] && [ $count -gt $JOB_LIMIT ]; then
+        echo "Job limit $JOB_LIMIT reached.  Halting creation of jobs."
+        break
+    fi
+
 #
 # Name the files
 #
@@ -91,41 +158,44 @@ do
 #
 # Create and set to the job subdirectory
 #
+
     cd $runDir
     mkdir -p $jobtag
     cd $jobtag
+
 #
 # Prepare job configuration file
 #
 
-sed "s|\\\$inputFileName|$inputFileName|g" < $configTemplate |
-sed "s|\\\$outputFileName|$outputFileName|g" > $jobcfg
+sed < $configTemplate \
+    "s|\\\$inputFileName|$inputFileName|g;
+     s|\\\$outputFileName|$outputFileName|g" > $jobcfg
 
 #
 # Prepare condor submit file for the job
 #
-    cat <<EOF > $consub
-X509UserProxy        = /tmp/x509up_u$UID
-Universe             = vanilla
-Executable           = $Executable
+cat >> $submitFile <<EOF
+
+InitialDir           = $jobtag
 Arguments            = $jobcfg `basename $outputFileName` $SRM_OUTPUT_DIR
-GetEnv               = true
 Transfer_Input_Files = $jobcfg
 output               = $stdout
 error                = $stderr
 Log                  = $conlog
-Copy_To_Spool        = false
-Notification         = never
-WhenToTransferOutput = On_Exit
-on_exit_remove       = (ExitBySignal == FALSE && ExitStatus == 0)
-Requirements = TARGET.HasAFS =!= FALSE && (TARGET.Site =?= "HEP" || TARGET.IsC2Cluster || TARGET.IsPCluster)
 Queue
 EOF
+done
+
+cd $runDir
+
 #
 # Submit the job
 #
-    condor_submit $consub
-done
+if [ -z "$NO_SUBMIT" ]; then
+  condor_submit $submitFile
+else
+  echo "Submit file $submitFile has been created but not submitted."
+fi
 
 echo -n "Jobs for $jobName are created in "
 pwd
