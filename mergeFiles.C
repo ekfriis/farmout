@@ -62,14 +62,15 @@ void mergeFiles(const char* outputFile, const char* inputFilesDirectory) {
   while(entry != 0)
     {
       int len = strlen(entry);
-      if(strcmp(&entry[len - 5], ".root") == 0)
+      if(len >= 5 && strcmp(&entry[len - 5], ".root") == 0)
         {
-          string fileName;
+          TString fileName;
           if(strncmp(inputFilesDirectory, "/pnfs", 5) == 0)
             {
               fileName = "dcap://";
             }
           fileName += inputFilesDirectory;
+		  if( !fileName.EndsWith("/") ) fileName += "/";
           fileName += entry;
 
           cout << "Merging root file: " << fileName << endl;
@@ -242,6 +243,9 @@ void MergeRootfile( TDirectory *target, TString source_name ) {
 
     ch->Add(source_name);
   }
+
+  delete nextobj;
+  nextobj = NULL;
 
   if( source ) {
     delete source;
