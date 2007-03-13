@@ -129,7 +129,7 @@ Copy_To_Spool        = false
 Notification         = never
 WhenToTransferOutput = On_Exit
 on_exit_remove       = (ExitBySignal == FALSE && ExitStatus == 0)
-Requirements = TARGET.HasAFS =!= FALSE && (TARGET.Site =?= "HEP" || TARGET.IsC2Cluster || TARGET.IsPCluster)
+Requirements = TARGET.HasAFS =?= True || TARGET.IsC2Cluster || TARGET.IsPCluster
 Queue
 EOF
 #
