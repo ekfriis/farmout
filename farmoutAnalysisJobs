@@ -15,19 +15,23 @@
 # Job parameters
 #
 
+
+# Initialize default settings:
+
 PNFS_HOME=/pnfs/hep.wisc.edu/data5/uscms01/$USER
 SRM_SERVER=srm://cmssrm.hep.wisc.edu:8443
+DCAP_SERVER=dcap://cmsdcap.hep.wisc.edu:22125
 SRM_HOME=${SRM_SERVER}/${PNFS_HOME}
+DCAP_HOME=${DCAP_SERVER}/${PNFS_HOME}
 
-PrintUsage() {
-  echo "USAGE: farmoutAnalysisJobs [options] <jobName> <CMSSW Version> <config file>"
-  echo ""
-  echo "OPTIONS:"
-  echo "  --output-dir=${SRM_HOME}/"
-  echo "  --no-submit"
-  echo "  --job-limit=N    (limit the number of jobs that are created)"
-  exit 2
-}
+scratch_dir="/data"
+if ! [ -d $scratch_dir ]; then
+  scratch_dir="/scratch"
+fi
+if ! [ -d $scratch_dir ]; then
+  scratch_dir="/tmp"
+fi
+SUBMIT_HOME=${scratch_dir}/$USER
 
 basename() {
   # This shell function is faster than calling /bin/basename
@@ -40,10 +44,37 @@ basename() {
   echo $path
 }
 
-OPTS=`getopt -o "h" -l "help,no-submit,job-limit:" -- "$@"`
+die() {
+  echo 2>&1 $1
+  exit 1
+}
+
+PrintUsage() {
+  echo "USAGE: farmoutAnalysisJobs [options] <jobName> <CMSSW Version> <config file>"
+  echo ""
+  echo "OPTIONS:"
+  echo "  --output-dir=${SRM_HOME}/<jobName>-<runName>"
+  echo "  --input-dir=${DCAP_HOME}/<jobName>"
+  echo "  --submit-dir=${SUBMIT_HOME}/<jobName>-<runName>"
+  echo "  --no-submit"
+  echo "  --job-limit=N           (limit the number of jobs that are created)"
+  echo "  --skip-existing-output  (do not create jobs if output file exists)"
+  echo ""
+  echo "Note that <runName> is taken from the name of the config file."
+  exit 2
+}
+
+OPTS=`getopt -o "h" -l "help,output-dir:,input-dir:,submit-dir:,no-submit,job-limit:,skip-existing-output:" -- "$@"`
 if [ $? -ne 0 ]; then PrintUsage; fi
 
 eval set -- "$OPTS"
+
+NO_SUBMIT=
+JOB_LIMIT=
+SKIP_EXISTING_OUTPUT=
+OUTPUT_DIR=
+INPUT_DIR=
+SUBMIT_DIR=
 
 while [ ! -z "$1" ]
 do
@@ -52,28 +83,60 @@ do
     --help) PrintUsage;;
     --no-submit) NO_SUBMIT=1;;
     --job-limit) shift; JOB_LIMIT=$1;;
+    --skip-existing-output) SKIP_EXISTING_OUTPUT=1;;
+    --output-dir) shift; OUTPUT_DIR=$1;;
+    --input-dir) shift; INPUT_DIR=$1;;
+    --submit-dir) shift; SUBMIT_DIR=$1;;
     --) shift; break;;
     *) echo "Unexpected option $1"; PrintUsage;;
   esac
   shift
 done
 
-if [ -z "$1" ]; then PrintUsage; fi
+if [ "$#" -ne 3 ]; then PrintUsage; fi
+
+
+# Check for some required utilities
+for exe in scramv1 condor_submit cmsRun.sh realpath; do
+  if ! which $exe >& /dev/null; then
+    echo "Cannot find $exe in PATH.  Your environment is not correctly set up."
+    exit 1
+  fi
+done
+
+# Additional command-line arguments
 
 jobName=$1
 CMSSW_HOME=`realpath $2`
 configTemplate=`realpath $3`
 
-#       Ensure that your environment is correct
+# Now we have all the user's input.
+
 
 runName=`basename $configTemplate .cfg`
-PNFS_DIR=${PNFS_HOME}/$jobName
-DCAP_BASE_DIR=dcap://cmsdcap.hep.wisc.edu:22125/$PNFS_DIR
-SRM_BASE_DIR=${SRM_SERVER}/$PNFS_DIR
-SRM_OUTPUT_DIR=${SRM_BASE_DIR}/$runName
+
+OUTPUT_DIR=${OUTPUT_DIR:-${SRM_HOME}/$jobName-$runName}
+INPUT_DIR=${INPUT_DIR:-${DCAP_HOME}/$jobName}
+SUBMIT_DIR=${SUBMIT_DIR:-${SUBMIT_HOME}/$jobName-$runName}
+
+#Strip off dcap://hostname:22125 to get raw pnfs path.
+LOCAL_INPUT_DIR=${INPUT_DIR#dcap://*:22125}
+
+#Get the part of INPUT_DIR that was stripped off.
+INPUT_BASE=${INPUT_DIR%$LOCAL_INPUT_DIR}
+
+if ! [ -d "$LOCAL_INPUT_DIR" ]; then
+  echo "Error: No such input directory: $LOCAL_INPUT_DIR"
+  exit 1
+fi
 
 if ! [ -d "$CMSSW_HOME" ]; then
-  echo "No such directory: $CMSSW_HOME"
+  echo "Error: No such CMSSW directory: $CMSSW_HOME"
+  exit 1
+fi
+
+if [ -d "$SUBMIT_DIR" ]; then
+  echo "Error: Submit directory already exists: $SUBMIT_DIR"
   exit 1
 fi
 
@@ -87,13 +150,12 @@ for macro in \$inputFileName \$outputFileName; do
 done
 
 #
-# Environment setup
+# CMSSW environment setup
 #
-#source /afs/hep.wisc.edu/cms/sw/osg0.4.1/setup.sh
 originalDir=`pwd`
 PATH=$PATH:$originalDir
 export PATH
-cd $CMSSW_HOME
+cd $CMSSW_HOME || die "Failed to cd to $CMSSW_HOME."
 eval `scramv1 runtime -sh`
 
 if [ "$?" != "0" ]; then
@@ -101,19 +163,12 @@ if [ "$?" != "0" ]; then
   exit 1
 fi
 
-scratch_dir="/data"
-if ! [ -d $scratch_dir ]; then
-  scratch_dir="/scratch"
-fi
-if ! [ -d $scratch_dir ]; then
-  scratch_dir="/tmp"
-fi
-
-runDir=$scratch_dir/$USER/$jobName-$runName
+runDir=$SUBMIT_DIR
 submitFile=$runDir/submit
 
 mkdir -p $runDir
-cd $runDir
+
+cd $runDir || die "Failed to create directory $runDir"
 
 #
 # Job specification
@@ -132,12 +187,16 @@ on_exit_remove       = (ExitBySignal == FALSE && ExitStatus == 0)
 Requirements = TARGET.HasAFS =?= True || TARGET.IsC2Cluster || TARGET.IsPCluster
 EOF
 
+
 #
 # Loop over input files
 #
 count=0
-for inputFile in $PNFS_DIR/*.root
+find $LOCAL_INPUT_DIR -name \*.root |
+while read inputFile
 do
+    inputFileURL=${INPUT_BASE}$inputFile
+
     count=$(($count+1))
     if [ ! -z $JOB_LIMIT ] && [ $count -gt $JOB_LIMIT ]; then
         echo "Job limit $JOB_LIMIT reached.  Halting creation of jobs."
@@ -153,15 +212,21 @@ do
     stdout=$jobtag.out
     stderr=$jobtag.err
     jobcfg=$jobtag.cfg
-    inputFileName=$DCAP_BASE_DIR/`basename $inputFile`
+    inputFileName=$inputFileURL
     outputFileName=$jobtag.root
+
+    if [ "$SKIP_EXISTING_OUTPUT" = "1" ]; then
+        # Check for existing output file
+        echo TODO
+    fi
+
 #
 # Create and set to the job subdirectory
 #
 
-    cd $runDir
+    cd $runDir || die "Failed to cd to $runDir"
     mkdir -p $jobtag
-    cd $jobtag
+    cd $jobtag || die "Failed to cd to $jobtag"
 
 #
 # Prepare job configuration file
@@ -177,14 +242,14 @@ sed < $configTemplate \
 cat >> $submitFile <<EOF
 
 InitialDir           = $jobtag
-Arguments            = $jobcfg `basename $outputFileName` $SRM_OUTPUT_DIR
+Arguments            = $jobcfg `basename $outputFileName` $OUTPUT_DIR
 Transfer_Input_Files = $jobcfg
 output               = $stdout
 error                = $stderr
 Log                  = $conlog
 Queue
 EOF
-done
+done || exit 1
 
 cd $runDir
 
@@ -192,7 +257,7 @@ cd $runDir
 # Submit the job
 #
 if [ -z "$NO_SUBMIT" ]; then
-  condor_submit $submitFile
+  condor_submit $submitFile || die "Failed to submit $submitFile"
 else
   echo "Submit file $submitFile has been created but not submitted."
 fi
