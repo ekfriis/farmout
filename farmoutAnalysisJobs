@@ -22,7 +22,7 @@ PNFS_HOME=/pnfs/hep.wisc.edu/data5/uscms01/$USER
 SRM_SERVER=srm://cmssrm.hep.wisc.edu:8443
 DCAP_SERVER=dcap://cmsdcap.hep.wisc.edu:22125
 SRM_HOME=${SRM_SERVER}/${PNFS_HOME}
-DCAP_HOME=${DCAP_SERVER}/${PNFS_HOME}
+DCAP_HOME=${DCAP_SERVER}${PNFS_HOME}
 
 scratch_dir="/data"
 if ! [ -d $scratch_dir ]; then
@@ -49,6 +49,19 @@ die() {
   exit 1
 }
 
+outputFileExists() {
+  fname=$1
+
+  #Strip off srm://hostname:8443 to get raw pnfs path.
+  local_fname=${fname#srm://*:8443}
+
+  echo "Local file name: $local_fname"
+  if [ -f "$local_fname" ]; then
+    return 0
+  fi
+  return 1
+}
+
 PrintUsage() {
   echo "USAGE: farmoutAnalysisJobs [options] <jobName> <CMSSW Version> <config file>"
   echo ""
@@ -57,14 +70,15 @@ PrintUsage() {
   echo "  --input-dir=${DCAP_HOME}/<jobName>"
   echo "  --submit-dir=${SUBMIT_HOME}/<jobName>-<runName>"
   echo "  --no-submit"
-  echo "  --job-limit=N           (limit the number of jobs that are created)"
+  echo "  --job-count=N           (limit the number of jobs that are created)"
   echo "  --skip-existing-output  (do not create jobs if output file exists)"
+  echo "  --skip-existing-jobs    (do not create jobs if job already created)"
   echo ""
   echo "Note that <runName> is taken from the name of the config file."
   exit 2
 }
 
-OPTS=`getopt -o "h" -l "help,output-dir:,input-dir:,submit-dir:,no-submit,job-limit:,skip-existing-output:" -- "$@"`
+OPTS=`getopt -o "h" -l "help,output-dir:,input-dir:,submit-dir:,no-submit,job-count:,skip-existing-output,skip-existing-jobs" -- "$@"`
 if [ $? -ne 0 ]; then PrintUsage; fi
 
 eval set -- "$OPTS"
@@ -72,6 +86,7 @@ eval set -- "$OPTS"
 NO_SUBMIT=
 JOB_LIMIT=
 SKIP_EXISTING_OUTPUT=
+SKIP_EXISTING_JOBS=
 OUTPUT_DIR=
 INPUT_DIR=
 SUBMIT_DIR=
@@ -82,8 +97,9 @@ do
     -h) PrintUsage;;
     --help) PrintUsage;;
     --no-submit) NO_SUBMIT=1;;
-    --job-limit) shift; JOB_LIMIT=$1;;
+    --job-count) shift; JOB_LIMIT=$1;;
     --skip-existing-output) SKIP_EXISTING_OUTPUT=1;;
+    --skip-existing-jobs) SKIP_EXISTING_JOBS=1;;
     --output-dir) shift; OUTPUT_DIR=$1;;
     --input-dir) shift; INPUT_DIR=$1;;
     --submit-dir) shift; SUBMIT_DIR=$1;;
@@ -135,8 +151,10 @@ if ! [ -d "$CMSSW_HOME" ]; then
   exit 1
 fi
 
-if [ -d "$SUBMIT_DIR" ]; then
+if [ -d "$SUBMIT_DIR" ] && [ "$SKIP_EXISTING_JOBS" != "1" ]; then
   echo "Error: Submit directory already exists: $SUBMIT_DIR"
+  echo "You must either remove it, or specify --skip-existing-jobs, or"
+  echo "specify a different submission directory with --submit-dir"
   exit 1
 fi
 
@@ -166,6 +184,17 @@ fi
 runDir=$SUBMIT_DIR
 submitFile=$runDir/submit
 
+# Make sure submitFile name is unique in case we are continuing a previous
+# submission.
+if [ -f $submitFile ]; then
+  num=1
+  while [ -f $submitFile.$num ]; do
+    num=$(($num+1))
+  done
+  submitFile=$submitFile.$num
+fi
+
+
 mkdir -p $runDir
 
 cd $runDir || die "Failed to create directory $runDir"
@@ -175,6 +204,7 @@ cd $runDir || die "Failed to create directory $runDir"
 #
 Executable=`which cmsRun.sh`
 
+# First put all the submit file commands that are the same for all jobs.
     cat <<EOF > $submitFile
 X509UserProxy        = /tmp/x509up_u$UID
 Universe             = vanilla
@@ -188,6 +218,8 @@ Requirements = TARGET.HasAFS =?= True || TARGET.IsC2Cluster || TARGET.IsPCluster
 EOF
 
 
+echo "Generating submit files in $runDir..."
+
 #
 # Loop over input files
 #
@@ -196,12 +228,6 @@ find $LOCAL_INPUT_DIR -name \*.root |
 while read inputFile
 do
     inputFileURL=${INPUT_BASE}$inputFile
-
-    count=$(($count+1))
-    if [ ! -z $JOB_LIMIT ] && [ $count -gt $JOB_LIMIT ]; then
-        echo "Job limit $JOB_LIMIT reached.  Halting creation of jobs."
-        break
-    fi
 
 #
 # Name the files
@@ -215,16 +241,31 @@ do
     inputFileName=$inputFileURL
     outputFileName=$jobtag.root
 
-    if [ "$SKIP_EXISTING_OUTPUT" = "1" ]; then
-        # Check for existing output file
-        echo TODO
-    fi
-
 #
 # Create and set to the job subdirectory
 #
 
     cd $runDir || die "Failed to cd to $runDir"
+
+
+    if [ "$SKIP_EXISTING_JOBS" = "1" ] && [ -d $jobtag ]; then
+      continue
+    fi
+
+    if [ "$SKIP_EXISTING_OUTPUT" = "1" ]; then
+      # Check for existing output file
+      if outputFileExists $OUTPUT_DIR/$outputFileName; then
+        continue
+      fi
+    fi
+
+    count=$(($count+1))
+    if [ ! -z $JOB_LIMIT ] && [ $count -gt $JOB_LIMIT ]; then
+        echo "Job limit $JOB_LIMIT reached.  Halting creation of jobs."
+        break
+    fi
+    echo -n "."
+
     mkdir -p $jobtag
     cd $jobtag || die "Failed to cd to $jobtag"
 
@@ -251,12 +292,18 @@ Queue
 EOF
 done || exit 1
 
+echo ""
+
 cd $runDir
 
 #
 # Submit the job
 #
-if [ -z "$NO_SUBMIT" ]; then
+if ! grep -q ^Queue $submitFile; then
+  echo "No jobs were created, so there is nothing to do."
+  rm $submitFile
+  exit 0
+elif [ -z "$NO_SUBMIT" ]; then
   condor_submit $submitFile || die "Failed to submit $submitFile"
 else
   echo "Submit file $submitFile has been created but not submitted."
