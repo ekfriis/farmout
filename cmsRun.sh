@@ -49,5 +49,15 @@ if [ "$rc" != "0" ]; then
   echo "srmcp exited with status $rc"
   exit 1
 fi
-
 rm $datafile
+
+# Copy all other root files in the directory also
+
+for file in *.root; do
+    srmcp -debug=true file://localhost/`pwd`/$file $SRM_OUTPUT_DIR/$file
+    if [ "$rc" != "0"]; then
+	echo "srmcp exited with status $rc for $file"
+	exit 1
+    fi
+    rm $file
+done
