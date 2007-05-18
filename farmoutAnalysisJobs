@@ -9,7 +9,7 @@
 # The config file should refer to the following macros, which are automatically
 # inserted by this script:
 #
-# $inputFileName      ==>  Will be replaced by one of the files in the dataset location
+# $inputFileNames     ==>  Will be replaced by list of input files
 # $outputFileName     ==>  Will be replaced by the $inputFileName-output.root
 #
 # Job parameters
@@ -71,14 +71,17 @@ PrintUsage() {
   echo "  --submit-dir=${SUBMIT_HOME}/<jobName>-<runName>"
   echo "  --no-submit"
   echo "  --job-count=N           (limit the number of jobs that are created)"
+  echo "  --input-files-per-job=1"
   echo "  --skip-existing-output  (do not create jobs if output file exists)"
   echo "  --skip-existing-jobs    (do not create jobs if job already created)"
+  echo "  --match-input-files='*.root'"
+  echo "  --exclude-input-files=pattern"
   echo ""
   echo "Note that <runName> is taken from the name of the config file."
   exit 2
 }
 
-OPTS=`getopt -o "h" -l "help,output-dir:,input-dir:,submit-dir:,no-submit,job-count:,skip-existing-output,skip-existing-jobs" -- "$@"`
+OPTS=`getopt -o "h" -l "help,output-dir:,input-dir:,submit-dir:,no-submit,job-count:,skip-existing-output,skip-existing-jobs,match-input-files:,exclude-input-files:,input-files-per-job:" -- "$@"`
 if [ $? -ne 0 ]; then PrintUsage; fi
 
 eval set -- "$OPTS"
@@ -90,6 +93,9 @@ SKIP_EXISTING_JOBS=
 OUTPUT_DIR=
 INPUT_DIR=
 SUBMIT_DIR=
+MATCH_INPUT_FILES='*.root'
+EXCLUDE_INPUT_FILES=
+INPUT_FILES_PER_JOB=1
 
 while [ ! -z "$1" ]
 do
@@ -103,6 +109,9 @@ do
     --output-dir) shift; OUTPUT_DIR=$1;;
     --input-dir) shift; INPUT_DIR=$1;;
     --submit-dir) shift; SUBMIT_DIR=$1;;
+    --match-input-files) shift; MATCH_INPUT_FILES=$1;;
+    --exclude-input-files) shift; EXCLUDE_INPUT_FILES=$1;;
+    --input-files-per-job) shift; INPUT_FILES_PER_JOB=$1;;
     --) shift; break;;
     *) echo "Unexpected option $1"; PrintUsage;;
   esac
@@ -160,7 +169,7 @@ fi
 
 # Check the config template
 
-for macro in \$inputFileName \$outputFileName; do
+for macro in \$inputFileNames \$outputFileName; do
   if ! grep -F -q $macro $configTemplate; then
     echo "$macro must appear on the configuration template.  I can't find it in $configTemplate"
     exit 1
@@ -224,22 +233,33 @@ echo "Generating submit files in $runDir..."
 #
 # Loop over input files
 #
+
+EXCLUDE_ARG=
+if [ "$EXCLUDE_INPUT_FILES" != "" ]; then
+  EXCLUDE_ARG="-not -name $EXCLUDE_INPUT_FILES"
+fi
+
 count=0
-find $LOCAL_INPUT_DIR -name \*.root |
-while read inputFile
+find $LOCAL_INPUT_DIR -name $MATCH_INPUT_FILES $EXCLUDE_ARG |
+while read firstInputFile
 do
-    inputFileURL=${INPUT_BASE}$inputFile
+    inputFileNames="\"${INPUT_BASE}/$firstInputFile\""
+
+    i=$(($INPUT_FILES_PER_JOB-1))
+    while [ $i -gt 0 ] && read nextInputFile; do
+        i=$(($i-1))
+        inputFileNames="${inputFileNames},\"${INPUT_BASE}/$nextInputFile\""
+    done
 
 #
 # Name the files
 #
-    jobtag=$runName-`basename $inputFile .root`
+    jobtag=$runName-`basename $firstInputFile .root`
     consub=$jobtag.sub
     conlog=$jobtag.log
     stdout=$jobtag.out
     stderr=$jobtag.err
     jobcfg=$jobtag.cfg
-    inputFileName=$inputFileURL
     outputFileName=$jobtag.root
 
 #
@@ -275,7 +295,7 @@ do
 #
 
 sed < $configTemplate \
-    "s|\\\$inputFileName|$inputFileName|g;
+    "s|\\\$inputFileNames|$inputFileNames|g;
      s|\\\$outputFileName|$outputFileName|g" > $jobcfg
 
 #
