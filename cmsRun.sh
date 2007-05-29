@@ -53,7 +53,7 @@ rm $datafile
 
 # Copy all other root files in the directory also
 
-for file in *.root; do
+for file in `ls -1 *.root 2>/dev/null`; do
     srmcp -debug=true file://localhost/`pwd`/$file $SRM_OUTPUT_DIR/$file
     if [ "$rc" != "0"]; then
 	echo "srmcp exited with status $rc for $file"
@@ -61,3 +61,5 @@ for file in *.root; do
     fi
     rm $file
 done
+
+exit 0
