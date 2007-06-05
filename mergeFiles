@@ -27,6 +27,17 @@ PrintUsage() {
   echo "  --copy-timeout=N  (seconds)"
   echo ""
   echo "Note that <mergeName> is taken from the name of the output file."
+  echo
+  echo "This script copies files from dCache to a local directory and then"
+  echo "merges them together.  The purpose of copying the files is to better"
+  echo "control what happens when access to a file in dCache hangs due to"
+  echo "the dCache node(s) where the file resides being offline."
+  echo "By default, this script will hang indefinitely in such cases, but"
+  echo "you can do two things: one is to specify --copy-timeout.  The other"
+  echo "is to kill the hung dccp process.  Unless you specify --abort-on-copy-error"
+  echo "the merge will go ahead even if some files failed to be copied"
+  echo "from dCache.  To know whether any files were skipped, search for"
+  echo "WARNING in the output from this script."
   exit 2
 }
 
@@ -64,10 +75,7 @@ if [ "$#" -lt 2 ]; then PrintUsage; fi
 MERGE_FILE=$1
 shift
 
-if [ -f "$MERGE_FILE" ]; then
-  echo "ERROR: $MERGE_FILE already exists.  Aborting."
-  exit 1
-fi
+! [ -f "$MERGE_FILE" ] || die "ERROR: $MERGE_FILE already exists.  Aborting."
 
 if [ "$CACHE_DIR" = "" ]; then
   CACHE_DIR=$CACHE_HOME/`basename $MERGE_FILE .root`
@@ -150,3 +158,5 @@ if [ "$?" != "0" ]; then
   echo "WARNING: the merge command exited with non-zero status"
   exit 1
 fi
+
+echo "Done merging $files in $CACHE_DIR into merge file $MERGE_FILE"
