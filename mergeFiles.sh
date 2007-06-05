@@ -1,0 +1,152 @@
+#!/bin/sh
+
+scratch_dir="/data"
+if ! [ -d $scratch_dir ]; then
+  scratch_dir="/scratch"
+fi
+if ! [ -d $scratch_dir ]; then
+  scratch_dir="/tmp"
+fi
+CACHE_HOME=${scratch_dir}/$USER
+
+die() {
+  echo 2>&1 $1
+  exit 1
+}
+
+
+PrintUsage() {
+  echo "USAGE: $0 [options] output_file input_directory(s)"
+  echo ""
+  echo "OPTIONS:"
+  echo "  --cache-dir=${CACHE_HOME}/<mergeName>"
+  echo "  --match-input-files='*.root'"
+  echo "  --exclude-input-files=pattern"
+  echo "  --reuse-cache-files"
+  echo "  --abort-on-copy-error"
+  echo "  --copy-timeout=N  (seconds)"
+  echo ""
+  echo "Note that <mergeName> is taken from the name of the output file."
+  exit 2
+}
+
+OPTS=`getopt -o "h" -l "help,cache-dir:,match-input-files:,exclude-input-files:,reuse-cache-files,abort-on-copy-error,copy-timeout:" -- "$@"`
+if [ $? -ne 0 ]; then PrintUsage; fi
+
+eval set -- "$OPTS"
+
+CACHE_DIR=
+MATCH_INPUT_FILES='*.root'
+EXCLUDE_INPUT_FILES=
+REUSE_CACHE_FILES=
+ABORT_ON_COPY_ERROR=0
+COPY_TIMEOUT=0
+
+while [ ! -z "$1" ]
+do
+  case "$1" in
+    -h) PrintUsage;;
+    --help) PrintUsage;;
+    --cache-dir) shift; CACHE_DIR=$1;;
+    --match-input-files) shift; MATCH_INPUT_FILES=$1;;
+    --exclude-input-files) shift; EXCLUDE_INPUT_FILES=$1;;
+    --reuse-cache-files) REUSE_CACHE_FILES=1;;
+    --abort-on-copy-error) ABORT_ON_COPY_ERROR=1;;
+    --copy-timeout) shift; COPY_TIMEOUT=$1;;
+    --) shift; break;;
+    *) echo "Unexpected option $1"; PrintUsage;;
+  esac
+  shift
+done
+
+if [ "$#" -lt 2 ]; then PrintUsage; fi
+
+MERGE_FILE=$1
+shift
+
+if [ -f "$MERGE_FILE" ]; then
+  echo "ERROR: $MERGE_FILE already exists.  Aborting."
+  exit 1
+fi
+
+if [ "$CACHE_DIR" = "" ]; then
+  CACHE_DIR=$CACHE_HOME/`basename $MERGE_FILE .root`
+fi
+
+if [ -d "$CACHE_DIR" ]; then
+  if [ "$REUSE_CACHE_FILES" = "1" ]; then
+    echo "Reusing any existing files in $CACHE_DIR."
+  else
+    echo "ERROR: cache directory already exists: $CACHE_DIR."
+    echo "Either remove it or specify --reuse-cache-files."
+    exit 1
+  fi
+fi
+
+if [ "$COPY_TIMEOUT" != "0" ]; then
+  TIMEOUT_EXE=run-with-timeout
+  TIMEOUT_CMD="run-with-timeout --timeout=$COPY_TIMEOUT"
+fi
+
+# Check for some required utilities
+for exe in root dccp $TIMEOUT_EXE; do
+  if ! which $exe >& /dev/null; then
+    echo "Cannot find $exe in PATH.  Your environment is not correctly set up."
+    exit 1
+  fi
+done
+
+MERGE_C=$0
+if ! [ -f $0 ]; then
+  MERGE_C=`which $0`
+fi
+MERGE_C=$(dirname $MERGE_C)/mergeFiles.C
+if ! [ -f $MERGE_C ]; then
+  echo "ERROR: no such file: $MERGE_C"
+  exit 1
+fi
+
+mkdir -p $CACHE_DIR || die "Failed to create $CACHE_DIR."
+
+for dir; do
+  if [ "$EXCLUDE_INPUT_FILES" != "" ]; then
+    EXCLUDE_OPTION="-not -name $EXCLUDE_INPUT_FILES"
+  fi
+  find $dir -type f -name "$MATCH_INPUT_FILES" $EXCLUDE_OPTION |
+  while read fname; do
+    dest_fname=${CACHE_DIR}/`basename $fname`
+    if [ -s $dest_fname ]; then
+      echo "Already in local cache: `basename $fname`."
+    else
+      echo "Copying `basename $fname` to local cache."
+      $TIMEOUT_CMD dccp $fname $dest_fname
+      rc=$?
+      if [ "$rc" != 0 ]; then
+        desc="status $rc"
+        if [ "$rc" = "142" ]; then
+          desc="timed out after $COPY_TIMEOUT seconds"
+        fi
+        if [ "$ABORT_ON_COPY_ERROR" = 1 ]; then
+          echo "ERROR: the following command failed ($desc): dccp $fname $dest_fname"
+          exit 1
+        fi
+        echo "WARNING: the following command failed ($desc): dccp $fname $dest_fname"
+      fi
+    fi
+  done
+done
+
+files=`find $CACHE_DIR -type f -print | awk 'BEGIN{N=0} {N=N+1} END{print N}'`
+if ! [ "$files" -gt "0" ]; then
+  echo "WARNING: no files exist in $CACHE_DIR, so nothing to merge."
+  exit 1
+fi
+
+echo
+echo "Merging $files files in $CACHE_DIR into merge file $MERGE_FILE"
+root -b -l -q "$MERGE_C(\"$MERGE_FILE\",\"$CACHE_DIR\")"
+
+if [ "$?" != "0" ]; then
+  echo "WARNING: the merge command exited with non-zero status"
+  exit 1
+fi
