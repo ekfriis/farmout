@@ -7,6 +7,9 @@ SRM_OUTPUT_DIR=$3
 SRM_OUTPUT_FILE=$SRM_OUTPUT_DIR/$datafile
 OSG_SETUP=/afs/hep.wisc.edu/cms/sw/osg0.4.1/setup.sh
 
+# core files have a nasty habit of filling up disks and causing trouble
+ulimit -c 0
+
 outputFileExists() {
   srm_fname=$1
   source $OSG_SETUP
