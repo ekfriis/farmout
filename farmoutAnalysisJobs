@@ -55,7 +55,6 @@ outputFileExists() {
   #Strip off srm://hostname:8443 to get raw pnfs path.
   local_fname=${fname#srm://*:8443}
 
-  echo "Local file name: $local_fname"
   if [ -f "$local_fname" ]; then
     return 0
   fi
@@ -63,7 +62,7 @@ outputFileExists() {
 }
 
 PrintUsage() {
-  echo "USAGE: farmoutAnalysisJobs [options] <jobName> <CMSSW Version> <config file>"
+  echo "USAGE: farmoutAnalysisJobs [options] <jobName> <CMSSW Path> <config file>"
   echo ""
   echo "OPTIONS:"
   echo "  --output-dir=${SRM_HOME}/<jobName>-<runName>"
@@ -163,7 +162,7 @@ fi
 if [ -d "$SUBMIT_DIR" ] && [ "$SKIP_EXISTING_JOBS" != "1" ]; then
   echo "Error: Submit directory already exists: $SUBMIT_DIR"
   echo "You must either remove it, or specify --skip-existing-jobs, or"
-  echo "specify a different submission directory with --submit-dir"
+  echo "specify a different job name or submission directory with --submit-dir"
   exit 1
 fi
 

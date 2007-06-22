@@ -16,9 +16,93 @@
 # $randomNumber2
 # $nEventsPerJob
 # $outputFileName
-#
-# Job parameters
-#
+
+# Initialize default settings:
+
+PNFS_HOME=/pnfs/hep.wisc.edu/data5/uscms01/$USER
+SRM_SERVER=srm://cmssrm.hep.wisc.edu:8443
+DCAP_SERVER=dcap://cmsdcap.hep.wisc.edu:22125
+SRM_HOME=${SRM_SERVER}/${PNFS_HOME}
+DCAP_HOME=${DCAP_SERVER}${PNFS_HOME}
+
+scratch_dir="/data"
+if ! [ -d $scratch_dir ]; then
+  scratch_dir="/scratch"
+fi
+if ! [ -d $scratch_dir ]; then
+  scratch_dir="/tmp"
+fi
+SUBMIT_HOME=${scratch_dir}/$USER
+
+die() {
+  echo 2>&1 $1
+  exit 1
+}
+
+outputFileExists() {
+  fname=$1
+
+  #Strip off srm://hostname:8443 to get raw pnfs path.
+  local_fname=${fname#srm://*:8443}
+
+  if [ -f "$local_fname" ]; then
+    return 0
+  fi
+  return 1
+}
+
+PrintUsage() {
+  echo "USAGE: farmoutRandomSeedJobs [options] <jobName> <events> <events-per-job> <CMSSW Path> <config file>"
+  echo ""
+  echo "OPTIONS:"
+  echo "  --output-dir=${SRM_HOME}/<jobName>"
+  echo "  --submit-dir=${SUBMIT_HOME}/<jobName>"
+  echo "  --no-submit"
+  echo "  --skip-existing-output  (do not create job if output file exists)"
+  echo "  --skip-existing-jobs    (do not create job if already created)"
+  echo ""
+  exit 2
+}
+
+OPTS=`getopt -o "h" -l "help,output-dir:,submit-dir:,no-submit,skip-existing-output,skip-existing-jobs" -- "$@"`
+if [ $? -ne 0 ]; then PrintUsage; fi
+
+eval set -- "$OPTS"
+
+NO_SUBMIT=
+OUTPUT_DIR=
+SUBMIT_DIR=
+SKIP_EXISTING_OUTPUT=
+SKIP_EXISTING_JOBS=
+
+while [ ! -z "$1" ]
+do
+  case "$1" in
+    -h) PrintUsage;;
+    --help) PrintUsage;;
+    --no-submit) NO_SUBMIT=1;;
+    --output-dir) shift; OUTPUT_DIR=$1;;
+    --submit-dir) shift; SUBMIT_DIR=$1;;
+    --skip-existing-output) SKIP_EXISTING_OUTPUT=1;;
+    --skip-existing-jobs) SKIP_EXISTING_JOBS=1;;
+    --) shift; break;;
+    *) echo "Unexpected option $1"; PrintUsage;;
+  esac
+  shift
+done
+
+if [ "$#" -ne 5 ]; then PrintUsage; fi
+
+# Check for some required utilities
+for exe in scramv1 condor_submit cmsRun.sh realpath; do
+  if ! which $exe >& /dev/null; then
+    echo "Cannot find $exe in PATH.  Your environment is not correctly set up."
+    exit 1
+  fi
+done
+
+# Additional command-line arguments
+
 jobName=$1
 declare -i nEvents=$2
 declare -i nEventsPerJob=$3
@@ -26,8 +110,6 @@ CMSSW_HOME=`realpath $4`
 configTemplate=`realpath $5`
 
 #       Ensure that your environment is correct
-
-SRM_BASE_OUTPUT_DIR=srm://cmssrm.hep.wisc.edu:8443//pnfs/hep.wisc.edu/data5/uscms01/$USER
 
 if ! [ -d "$CMSSW_HOME" ]; then
   echo "No such directory: $CMSSW_HOME"
@@ -46,11 +128,10 @@ done
 #
 # Environment setup
 #
-#source /afs/hep.wisc.edu/cms/sw/osg0.4.1/setup.sh
 originalDir=`pwd`
 PATH=$PATH:$originalDir
 export PATH
-cd $CMSSW_HOME
+cd $CMSSW_HOME || die "Failed to cd to $CMSSW_HOME."
 eval `scramv1 runtime -sh`
 
 if [ "$?" != "0" ]; then
@@ -58,20 +139,20 @@ if [ "$?" != "0" ]; then
   exit 1
 fi
 
-scratch_dir="/data"
-if ! [ -d $scratch_dir ]; then
-  scratch_dir="/scratch"
-fi
-if ! [ -d $scratch_dir ]; then
-  scratch_dir="/tmp"
+OUTPUT_DIR=${OUTPUT_DIR:-${SRM_HOME}/$jobName}
+SUBMIT_DIR=${SUBMIT_DIR:-${SUBMIT_HOME}/$jobName}
+
+if [ -d "$SUBMIT_DIR" ] && [ "$SKIP_EXISTING_JOBS" != "1" ]; then
+  echo "Error: Submit directory already exists: $SUBMIT_DIR"
+  echo "You must either remove it, or specify --skip-existing-jobs, or"
+  echo "specify a different job name or submission directory with --submit-dir"
+  exit 1
 fi
 
-runDir=$scratch_dir/$USER/$jobName
+mkdir -p $SUBMIT_DIR
+cd $SUBMIT_DIR || die "Failed to create directory $SUBMIT_DIR"
 
-mkdir -p $runDir
-cd $runDir
-#fs setacl -dir $runDir -acl condor-hosts rlidwk # commented out if we're not submitting to afs
-SRM_OUTPUT_DIR=$SRM_BASE_OUTPUT_DIR/`basename $runDir`
+
 #
 # Job specification
 #
@@ -85,6 +166,7 @@ declare -i job=0
 # Loop over jobs
 #
 while (( $nEvents > $nEventsSubmitted )); do
+    cd $SUBMIT_DIR   || die "Failed to cd to $SUBMIT_DIR"
 #
 # Name the files
 #
@@ -97,12 +179,26 @@ while (( $nEvents > $nEventsSubmitted )); do
     outputFileName=`echo $jobName $job | awk '{printf("%s-%4.4d.root", $1, $2)}'`
     randomNumber=`date +%N%S | cut -c 1-6,10-`
     randomNumber2=`date +%N%S | cut -c 2-6,9-`
+
+    let job=$job+1
+
+    if [ "$SKIP_EXISTING_JOBS" = "1" ] && [ -d $jobtag ]; then
+      continue
+    fi
+
+    if [ "$SKIP_EXISTING_OUTPUT" = "1" ]; then
+      # Check for existing output file
+      if outputFileExists $OUTPUT_DIR/$outputFileName; then
+        continue
+      fi
+    fi
+
+
 #
 # Create and set to the job subdirectory
 #
-    cd $runDir
-    mkdir -p $jobtag
-    cd $jobtag
+    mkdir -p $jobtag || die "Failed to mkdir $jobtag"
+    cd $jobtag       || die "Failed to cd to $jobtag"
 #
 # Prepare job configuration file
 #
@@ -119,7 +215,7 @@ sed "s|\\\$outputFileName|$outputFileName|g" > $jobcfg
 X509UserProxy        = /tmp/x509up_u$UID
 Universe             = vanilla
 Executable           = $Executable
-Arguments            = $jobcfg `basename $outputFileName` $SRM_OUTPUT_DIR
+Arguments            = $jobcfg `basename $outputFileName` $OUTPUT_DIR
 GetEnv               = true
 Transfer_Input_Files = $jobcfg
 output               = $stdout
@@ -138,17 +234,16 @@ EOF
 # Prepare for the next job
 #
     let nEventsSubmitted=$nEventsSubmitted+$nEventsPerJob
-    if (( $nEventsSubmitted < $nEvents )); then
-	let job=$job+1
-    else
-	echo "$nEventsSubmitted >= $nEvents done!"
-    fi
+
 #
 # Submit the job
 #
-    condor_submit $consub
+    if [ -z "$NO_SUBMIT" ]; then
+        condor_submit $consub
+    else
+        echo "Submit file $consub has been created but not submitted."
+    fi
+
 done
 
-echo -n "Jobs for $jobName are created in "
-pwd
-cd $originalDir
+echo "Jobs for $nEventsSubmitted events of $jobName are created in $SUBMIT_DIR"
