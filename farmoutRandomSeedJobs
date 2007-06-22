@@ -129,6 +129,8 @@ Copy_To_Spool        = false
 Notification         = never
 WhenToTransferOutput = On_Exit
 on_exit_remove       = (ExitBySignal == FALSE && ExitStatus == 0)
+ImageSize            = 900000
++DiskUsage           = 2000000
 Requirements = TARGET.HasAFS =?= True
 Queue
 EOF
