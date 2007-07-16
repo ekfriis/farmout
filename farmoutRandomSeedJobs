@@ -177,8 +177,8 @@ while (( $nEvents > $nEventsSubmitted )); do
     stderr=`echo $jobName $job | awk '{printf("%s-%4.4d.err", $1, $2)}'`
     jobcfg=`echo $jobName $job | awk '{printf("%s-%4.4d.cfg", $1, $2)}'`
     outputFileName=`echo $jobName $job | awk '{printf("%s-%4.4d.root", $1, $2)}'`
-    randomNumber=`date +%N%S | cut -c 1-6,10-`
-    randomNumber2=`date +%N%S | cut -c 2-6,9-`
+    randomNumber=`date +%N%S | cut -c 1-6,10- | sed 's|^0*||'`
+    randomNumber2=`date +%N%S | cut -c 2-6,9- | sed 's|^0*||'`
 
     let job=$job+1
 
