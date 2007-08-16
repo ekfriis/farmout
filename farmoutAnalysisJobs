@@ -221,7 +221,7 @@ GetEnv               = true
 Copy_To_Spool        = false
 Notification         = never
 WhenToTransferOutput = On_Exit
-on_exit_remove       = (ExitBySignal == FALSE && ExitStatus == 0)
+on_exit_remove       = (ExitBySignal == FALSE && ExitCode == 0)
 +IsFastQueueJob      = True
 ImageSize            = 900000
 +DiskUsage           = 2000000

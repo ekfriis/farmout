@@ -224,7 +224,7 @@ Log                  = $conlog
 Copy_To_Spool        = false
 Notification         = never
 WhenToTransferOutput = On_Exit
-on_exit_remove       = (ExitBySignal == FALSE && ExitStatus == 0)
+on_exit_remove       = (ExitBySignal == FALSE && ExitCode == 0)
 ImageSize            = 900000
 +DiskUsage           = 2000000
 Requirements = TARGET.HasAFS_OSG =?= True && TARGET.OSRedHatRelease =!= "Scientific Linux SL Release 3.0.4 (SL)"
