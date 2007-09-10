@@ -25,6 +25,7 @@ PrintUsage() {
   echo "  --reuse-cache-files"
   echo "  --abort-on-copy-error"
   echo "  --copy-timeout=N  (seconds)"
+  echo "  --merge-only      (merge whatever files already exist in local cache)"
   echo ""
   echo "Note that <mergeName> is taken from the name of the output file."
   echo
@@ -41,7 +42,7 @@ PrintUsage() {
   exit 2
 }
 
-OPTS=`getopt -o "h" -l "help,cache-dir:,match-input-files:,exclude-input-files:,reuse-cache-files,abort-on-copy-error,copy-timeout:" -- "$@"`
+OPTS=`getopt -o "h" -l "help,cache-dir:,match-input-files:,exclude-input-files:,reuse-cache-files,abort-on-copy-error,copy-timeout:,merge-only" -- "$@"`
 if [ $? -ne 0 ]; then PrintUsage; fi
 
 eval set -- "$OPTS"
@@ -52,6 +53,7 @@ EXCLUDE_INPUT_FILES=
 REUSE_CACHE_FILES=
 ABORT_ON_COPY_ERROR=0
 COPY_TIMEOUT=0
+MERGE_ONLY=0
 
 while [ ! -z "$1" ]
 do
@@ -64,6 +66,7 @@ do
     --reuse-cache-files) REUSE_CACHE_FILES=1;;
     --abort-on-copy-error) ABORT_ON_COPY_ERROR=1;;
     --copy-timeout) shift; COPY_TIMEOUT=$1;;
+    --merge-only) MERGE_ONLY=1; REUSE_CACHE_FILES=1;;
     --) shift; break;;
     *) echo "Unexpected option $1"; PrintUsage;;
   esac
@@ -117,6 +120,8 @@ fi
 mkdir -p $CACHE_DIR || die "Failed to create $CACHE_DIR."
 
 for dir; do
+  if [ "$MERGE_ONLY" = "1" ]; then continue; fi
+
   if [ "$EXCLUDE_INPUT_FILES" != "" ]; then
     EXCLUDE_OPTION="-not -name $EXCLUDE_INPUT_FILES"
   fi
