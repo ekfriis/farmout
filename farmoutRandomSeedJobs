@@ -141,6 +141,7 @@ fi
 
 OUTPUT_DIR=${OUTPUT_DIR:-${SRM_HOME}/$jobName}
 SUBMIT_DIR=${SUBMIT_DIR:-${SUBMIT_HOME}/$jobName}
+submitFile=$SUBMIT_DIR/submit
 
 if [ -d "$SUBMIT_DIR" ] && [ "$SKIP_EXISTING_JOBS" != "1" ]; then
   echo "Error: Submit directory already exists: $SUBMIT_DIR"
@@ -157,6 +158,24 @@ cd $SUBMIT_DIR || die "Failed to create directory $SUBMIT_DIR"
 # Job specification
 #
 Executable=`which cmsRun.sh`
+
+
+# First put all the submit file commands that are the same for all jobs.
+    cat <<EOF > $submitFile
+X509UserProxy        = /tmp/x509up_u$UID
+Universe             = vanilla
+Executable           = $Executable
+GetEnv               = true
+Copy_To_Spool        = false
+Notification         = never
+WhenToTransferOutput = On_Exit
+on_exit_remove       = (ExitBySignal == FALSE && ExitCode == 0)
+ImageSize            = 900000
++DiskUsage           = 2000000
+Requirements = TARGET.HasAFS_OSG =?= True && TARGET.OSRedHatRelease =!= "Scientific Linux SL Release 3.0.4 (SL)"
+EOF
+
+
 #
 # Starting values for the job loop
 #
@@ -166,25 +185,23 @@ declare -i job=0
 # Loop over jobs
 #
 while (( $nEvents > $nEventsSubmitted )); do
-    cd $SUBMIT_DIR   || die "Failed to cd to $SUBMIT_DIR"
 #
 # Name the files
 #
-    jobtag=`echo $jobName $job | awk '{printf("%s-%4.4d", $1, $2)}'`
-    consub=`echo $jobName $job | awk '{printf("%s-%4.4d.sub", $1, $2)}'`
-    conlog=`echo $jobName $job | awk '{printf("%s-%4.4d.log", $1, $2)}'`
-    stdout=`echo $jobName $job | awk '{printf("%s-%4.4d.out", $1, $2)}'`
-    stderr=`echo $jobName $job | awk '{printf("%s-%4.4d.err", $1, $2)}'`
-    jobcfg=`echo $jobName $job | awk '{printf("%s-%4.4d.cfg", $1, $2)}'`
-    outputFileName=`echo $jobName $job | awk '{printf("%s-%4.4d.root", $1, $2)}'`
-    randomNumber=`date +%N%S | cut -c 1-6,10- | sed 's|^0*||'`
-    randomNumber2=`date +%N%S | cut -c 2-6,9- | sed 's|^0*||'`
+    jobtag=$jobName-`printf "%4.4d" $job`
 
     let job=$job+1
-
     if [ "$SKIP_EXISTING_JOBS" = "1" ] && [ -d $jobtag ]; then
       continue
     fi
+
+    conlog=$jobtag.log
+    stdout=$jobtag.out
+    stderr=$jobtag.err
+    jobcfg=$jobtag.cfg
+    outputFileName=$jobtag.root
+    randomNumber=`date +%N%S | cut -c 1-6,10- | sed 's|^0*||'`
+    randomNumber2=`date +%N%S | cut -c 2-6,9- | sed 's|^0*||'`
 
     if [ "$SKIP_EXISTING_OUTPUT" = "1" ]; then
       # Check for existing output file
@@ -195,39 +212,31 @@ while (( $nEvents > $nEventsSubmitted )); do
 
 
 #
-# Create and set to the job subdirectory
+# Create the job subdirectory
 #
     mkdir -p $jobtag || die "Failed to mkdir $jobtag"
-    cd $jobtag       || die "Failed to cd to $jobtag"
+
 #
 # Prepare job configuration file
 #
 
-sed "s|\\\$randomNumber|$randomNumber|g" < $configTemplate |
-sed "s|\\\$randomNumber2|$randomNumber2|g" |
-sed "s|\\\$nEventsPerJob|$nEventsPerJob|g" |
-sed "s|\\\$outputFileName|$outputFileName|g" > $jobcfg
+sed < $configTemplate \
+  "s|\\\$randomNumber|$randomNumber|g;
+   s|\\\$randomNumber2|$randomNumber2|g;
+   s|\\\$nEventsPerJob|$nEventsPerJob|g;
+   s|\\\$outputFileName|$outputFileName|g" > $jobtag/$jobcfg
 
 #
-# Prepare condor submit file for the job
+# Prepare condor submit commands for the job
 #
-    cat <<EOF > $consub
-X509UserProxy        = /tmp/x509up_u$UID
-Universe             = vanilla
-Executable           = $Executable
-Arguments            = $jobcfg `basename $outputFileName` $OUTPUT_DIR
-GetEnv               = true
+    cat <<EOF >> $submitFile
+
+InitialDir           = $jobtag
+Arguments            = $jobcfg $outputFileName $OUTPUT_DIR
 Transfer_Input_Files = $jobcfg
 output               = $stdout
 error                = $stderr
 Log                  = $conlog
-Copy_To_Spool        = false
-Notification         = never
-WhenToTransferOutput = On_Exit
-on_exit_remove       = (ExitBySignal == FALSE && ExitCode == 0)
-ImageSize            = 900000
-+DiskUsage           = 2000000
-Requirements = TARGET.HasAFS_OSG =?= True && TARGET.OSRedHatRelease =!= "Scientific Linux SL Release 3.0.4 (SL)"
 Queue
 EOF
 #
@@ -235,15 +244,15 @@ EOF
 #
     let nEventsSubmitted=$nEventsSubmitted+$nEventsPerJob
 
-#
-# Submit the job
-#
-    if [ -z "$NO_SUBMIT" ]; then
-        condor_submit $consub
-    else
-        echo "Submit file $consub has been created but not submitted."
-    fi
-
 done
+
+#
+# Submit the jobs
+#
+if [ -z "$NO_SUBMIT" ]; then
+    condor_submit $submitFile
+else
+    echo "Submit file $submitFile has been created but not submitted."
+fi
 
 echo "Jobs for $nEventsSubmitted events of $jobName are created in $SUBMIT_DIR"
