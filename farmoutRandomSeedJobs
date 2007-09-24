@@ -159,10 +159,11 @@ cd $SUBMIT_DIR || die "Failed to create directory $SUBMIT_DIR"
 #
 Executable=`which cmsRun.sh`
 
+proxy=${X509_USER_PROXY:-/tmp/x509up_u$UID}
 
 # First put all the submit file commands that are the same for all jobs.
     cat <<EOF > $submitFile
-X509UserProxy        = /tmp/x509up_u$UID
+X509UserProxy        = ${proxy}
 Universe             = vanilla
 Executable           = $Executable
 GetEnv               = true
@@ -250,6 +251,11 @@ done
 # Submit the jobs
 #
 if [ -z "$NO_SUBMIT" ]; then
+    # The job is messed up if X509_USER_PROXY is defined, because then
+    # Condor doesn't override this value to point to the actual proxy
+    # location on the execution node.
+    unset X509_USER_PROXY
+
     condor_submit $submitFile
 else
     echo "Submit file $submitFile has been created but not submitted."
