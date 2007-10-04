@@ -25,6 +25,9 @@ DCAP_SERVER=dcap://cmsdcap.hep.wisc.edu:22125
 SRM_HOME=${SRM_SERVER}/${PNFS_HOME}
 DCAP_HOME=${DCAP_SERVER}${PNFS_HOME}
 
+DISK_REQUIREMENTS=2000
+MEMORY_REQUIREMENTS=900
+
 scratch_dir="/data"
 if ! [ -d $scratch_dir ]; then
   scratch_dir="/scratch"
@@ -60,11 +63,13 @@ PrintUsage() {
   echo "  --no-submit"
   echo "  --skip-existing-output  (do not create job if output file exists)"
   echo "  --skip-existing-jobs    (do not create job if already created)"
+  echo "  --memory-requirements=$MEMORY_REQUIREMENTS (megabytes)"
+  echo "  --disk-requirements=$DISK_REQUIREMENTS  (megabytes)"
   echo ""
   exit 2
 }
 
-OPTS=`getopt -o "h" -l "help,output-dir:,submit-dir:,no-submit,skip-existing-output,skip-existing-jobs" -- "$@"`
+OPTS=`getopt -o "h" -l "help,output-dir:,submit-dir:,no-submit,skip-existing-output,skip-existing-jobs,disk-requirements:,memory-requirements:" -- "$@"`
 if [ $? -ne 0 ]; then PrintUsage; fi
 
 eval set -- "$OPTS"
@@ -85,6 +90,8 @@ do
     --submit-dir) shift; SUBMIT_DIR=$1;;
     --skip-existing-output) SKIP_EXISTING_OUTPUT=1;;
     --skip-existing-jobs) SKIP_EXISTING_JOBS=1;;
+    --disk-requirements) shift; DISK_REQUIREMENTS=$1;;
+    --memory-requirements) shift; MEMORY_REQUIREMENTS=$1;;
     --) shift; break;;
     *) echo "Unexpected option $1"; PrintUsage;;
   esac
@@ -171,8 +178,8 @@ Copy_To_Spool        = false
 Notification         = never
 WhenToTransferOutput = On_Exit
 on_exit_remove       = (ExitBySignal == FALSE && ExitCode == 0)
-ImageSize            = 900000
-+DiskUsage           = 2000000
+ImageSize            = $(($MEMORY_REQUIREMENTS*1000))
++DiskUsage           = $(($DISK_REQUIREMENTS*1000))
 Requirements = TARGET.HasAFS_OSG =?= True && TARGET.OSRedHatRelease =!= "Scientific Linux SL Release 3.0.4 (SL)"
 EOF
 

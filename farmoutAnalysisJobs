@@ -24,6 +24,9 @@ DCAP_SERVER=dcap://cmsdcap.hep.wisc.edu:22125
 SRM_HOME=${SRM_SERVER}/${PNFS_HOME}
 DCAP_HOME=${DCAP_SERVER}${PNFS_HOME}
 
+DISK_REQUIREMENTS=2000
+MEMORY_REQUIREMENTS=900
+
 scratch_dir="/data"
 if ! [ -d $scratch_dir ]; then
   scratch_dir="/scratch"
@@ -69,18 +72,20 @@ PrintUsage() {
   echo "  --input-dir=${DCAP_HOME}/<jobName>"
   echo "  --submit-dir=${SUBMIT_HOME}/<jobName>-<runName>"
   echo "  --no-submit"
-  echo "  --job-count=N           (limit the number of jobs that are created)"
+  echo "  --job-count=N            (limit the number of jobs that are created)"
   echo "  --input-files-per-job=1"
-  echo "  --skip-existing-output  (do not create jobs if output file exists)"
-  echo "  --skip-existing-jobs    (do not create jobs if job already created)"
+  echo "  --skip-existing-output   (do not create jobs if output file exists)"
+  echo "  --skip-existing-jobs     (do not create jobs if job already created)"
   echo "  --match-input-files='*.root'"
   echo "  --exclude-input-files=pattern"
+  echo "  --memory-requirements=$MEMORY_REQUIREMENTS (megabytes)"
+  echo "  --disk-requirements=$DISK_REQUIREMENTS  (megabytes)"
   echo ""
   echo "Note that <runName> is taken from the name of the config file."
   exit 2
 }
 
-OPTS=`getopt -o "h" -l "help,output-dir:,input-dir:,submit-dir:,no-submit,job-count:,skip-existing-output,skip-existing-jobs,match-input-files:,exclude-input-files:,input-files-per-job:" -- "$@"`
+OPTS=`getopt -o "h" -l "help,output-dir:,input-dir:,submit-dir:,no-submit,job-count:,skip-existing-output,skip-existing-jobs,match-input-files:,exclude-input-files:,input-files-per-job:,disk-requirements:,memory-requirements:" -- "$@"`
 if [ $? -ne 0 ]; then PrintUsage; fi
 
 eval set -- "$OPTS"
@@ -111,6 +116,8 @@ do
     --match-input-files) shift; MATCH_INPUT_FILES=$1;;
     --exclude-input-files) shift; EXCLUDE_INPUT_FILES=$1;;
     --input-files-per-job) shift; INPUT_FILES_PER_JOB=$1;;
+    --disk-requirements) shift; DISK_REQUIREMENTS=$1;;
+    --memory-requirements) shift; MEMORY_REQUIREMENTS=$1;;
     --) shift; break;;
     *) echo "Unexpected option $1"; PrintUsage;;
   esac
@@ -225,8 +232,8 @@ Notification         = never
 WhenToTransferOutput = On_Exit
 on_exit_remove       = (ExitBySignal == FALSE && ExitCode == 0)
 +IsFastQueueJob      = True
-ImageSize            = 900000
-+DiskUsage           = 2000000
+ImageSize            = $(($MEMORY_REQUIREMENTS*1000))
++DiskUsage           = $(($DISK_REQUIREMENTS*1000))
 Requirements = TARGET.HasAFS_OSG =?= True && TARGET.OSRedHatRelease =!= "Scientific Linux SL Release 3.0.4 (SL)"
 EOF
 
