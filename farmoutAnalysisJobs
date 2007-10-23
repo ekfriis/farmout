@@ -264,7 +264,13 @@ do
 #
 # Name the files
 #
-    jobtag=$runName-`basename $firstInputFile .root`
+    rootname=`basename $firstInputFile .root`
+    jobtag=$runName-$rootname
+    if [ ${#jobtag} -gt 245 ]; then
+        # Condor (as of 6.9.4) cannot handle file names longer than 256
+        jobtag=$rootname
+    fi
+
     consub=$jobtag.sub
     conlog=$jobtag.log
     stdout=$jobtag.out
