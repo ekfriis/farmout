@@ -7,6 +7,9 @@ SRM_OUTPUT_DIR=$3
 SRM_OUTPUT_FILE="$SRM_OUTPUT_DIR/$datafile"
 OSG_SETUP=/afs/hep.wisc.edu/cms/sw/osg0.4.1/setup.sh
 
+# special exit status to force job to leave the queue
+FAIL_JOB=42
+
 # core files have a nasty habit of filling up disks and causing trouble,
 # so disable them.
 ulimit -c 0
@@ -90,7 +93,9 @@ if [ "$rc" != "0" ]; then
   if [ -f $datafile ]; then
     mv $datafile cmsRun_failed_$datafile
   fi
-  exit 1
+  # Do not try to run this job again.  Would be nice to detect transient
+  # errors (e.g. dCache down) and retry in those cases.
+  exit $FAIL_JOB
 fi
 
 # load environment for using srmcp

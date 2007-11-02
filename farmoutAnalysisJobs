@@ -27,6 +27,9 @@ DCAP_HOME=${DCAP_SERVER}${PNFS_HOME}
 DISK_REQUIREMENTS=2000
 MEMORY_REQUIREMENTS=900
 
+# special exit status to force job to leave the queue
+FAIL_JOB=42
+
 scratch_dir="/data"
 if ! [ -d $scratch_dir ]; then
   scratch_dir="/scratch"
@@ -230,7 +233,7 @@ GetEnv               = true
 Copy_To_Spool        = false
 Notification         = never
 WhenToTransferOutput = On_Exit
-on_exit_remove       = (ExitBySignal == FALSE && ExitCode == 0)
+on_exit_remove       = (ExitBySignal == FALSE && (ExitCode == 0 || (ExitCode == ${FAIL_JOB} && JobRunCount>3)))
 +IsFastQueueJob      = True
 ImageSize            = $(($MEMORY_REQUIREMENTS*1000))
 +DiskUsage           = $(($DISK_REQUIREMENTS*1000))
