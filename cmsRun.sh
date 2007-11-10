@@ -98,9 +98,13 @@ if [ "${FARMOUT_DASHBOARD_REPORTER}" != "" ]; then
     ${FARMOUT_DASHBOARD_REPORTER} execution
 fi
 
-cmsRun $jobcfg
+start_time=`date "+%s"`
 
+cmsRun $jobcfg
 rc=$?
+
+dboard_ExeTime=$((`date "+%s"` -  $start_time))
+
 if [ "$rc" != "0" ]; then
   echo "cmsRun exited with status $rc"
   if [ -f $datafile ]; then

@@ -1,5 +1,8 @@
 #!/bin/sh
 
+# This script is used to report farmout jobs to the CMS dashboard.
+# Users should not need to call this script directly.
+
 if [ "$CMS_DASHBOARD_REPORTER" = "" ]; then
   echo "No CMS_DASHBOARD_REPORTER found in environment. "\
        "Dashboard will not be updated."
@@ -94,9 +97,6 @@ report_completion() {
     if [ "${dboard_ExeExitCode}" = "" ]; then
         dboard_ExeExitCode=${dboard_JobExitCode}
     fi
-
-    # CRAB reports ExeTime, Julia's doc says WCCPU
-    dboard_ExeTime=${dboard_WCCPU}
 
     required_args="ExeTime ExeExitCode"
     optional_args=""
