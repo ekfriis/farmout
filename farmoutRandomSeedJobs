@@ -171,12 +171,42 @@ Executable=`which cmsRun.sh`
 
 proxy=${X509_USER_PROXY:-/tmp/x509up_u$UID}
 
+#
+# CMS Dashboard parameters
+#
+FARMOUT_DASHBOARD_REPORTER=`which farmout_dashboard.sh 2>/dev/null`
+if [ "$FARMOUT_DASHBOARD_REPORTER" = "" ]; then
+   echo "No farmout_dashboard.sh found, so no reporting to the CMS dashboard."
+fi
+if [ "$CMS_DASHBOARD_REPORTER" = "" ]; then
+   echo No CMS_DASHBOARD_REPORTER defined, so no reporting to the CMS dashboard.
+fi
+dboard="
+dboard_taskId=${USER}-`hostname -f`-\$\$([ClusterId])
+dboard_jobId=\$\$([ProcId])
+dboard_sid=\$\$([GlobalJobId])
+dboard_application=`basename ${CMSSW_HOME}`
+dboard_exe=cmsRun
+dboard_tool=farmout
+dboard_scheduler=local-condor
+dboard_taskType=simulation
+dboard_broker=local-condor-`hostname -f`
+dboard_user=${USER}
+dboard_SyncCE=${CMS_DASHBOARD_LOCAL_CE}
+CMS_DASHBOARD_REPORTER=${CMS_DASHBOARD_REPORTER}
+FARMOUT_DASHBOARD_REPORTER=${FARMOUT_DASHBOARD_REPORTER}
+"
+# convert newlines to spaces
+dboard="`echo $dboard`"
+
+
 # First put all the submit file commands that are the same for all jobs.
     cat <<EOF > $submitFile
 X509UserProxy        = ${proxy}
 Universe             = vanilla
 Executable           = $Executable
 GetEnv               = true
+Environment          = "${dboard}"
 Copy_To_Spool        = false
 Notification         = never
 WhenToTransferOutput = On_Exit

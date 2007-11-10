@@ -5,7 +5,7 @@ jobcfg=$1
 datafile=$2
 SRM_OUTPUT_DIR=$3
 SRM_OUTPUT_FILE="$SRM_OUTPUT_DIR/$datafile"
-OSG_SETUP=/afs/hep.wisc.edu/cms/sw/osg0.4.1/setup.sh
+OSG_SETUP=/afs/hep.wisc.edu/cms/sw/osg/setup.sh
 
 # special exit status to force job to leave the queue
 FAIL_JOB=42
@@ -13,6 +13,14 @@ FAIL_JOB=42
 # core files have a nasty habit of filling up disks and causing trouble,
 # so disable them.
 ulimit -c 0
+
+dashboard_completion() {
+  dboard_ExeExitCode=$1
+
+  if [ "${FARMOUT_DASHBOARD_REPORTER}" != "" ]; then
+      ${FARMOUT_DASHBOARD_REPORTER} completion
+  fi
+}
 
 outputFileExists() {
   srm_fname="$1"
@@ -85,6 +93,11 @@ if outputFileExists $SRM_OUTPUT_FILE; then
   exit 0
 fi
 
+if [ "${FARMOUT_DASHBOARD_REPORTER}" != "" ]; then
+    ${FARMOUT_DASHBOARD_REPORTER} submission
+    ${FARMOUT_DASHBOARD_REPORTER} execution
+fi
+
 cmsRun $jobcfg
 
 rc=$?
@@ -93,6 +106,9 @@ if [ "$rc" != "0" ]; then
   if [ -f $datafile ]; then
     mv $datafile cmsRun_failed_$datafile
   fi
+
+  dashboard_completion $rc
+
   # Do not try to run this job again.  Would be nice to detect transient
   # errors (e.g. dCache down) and retry in those cases.
   exit $FAIL_JOB
@@ -102,6 +118,7 @@ fi
 source $OSG_SETUP
 
 if ! DoSrmcp "file://localhost/`pwd`/$datafile" "$SRM_OUTPUT_FILE"; then
+  dashboard_completion 60307
   exit 1
 fi
 
@@ -111,9 +128,12 @@ rm $datafile
 
 for file in `ls -1 *.root 2>/dev/null`; do
     if ! DoSrmcp file://localhost/`pwd`/$file $SRM_OUTPUT_DIR/$file; then
+        dashboard_completion 60307
 	exit 1
     fi
     rm $file
 done
+
+dashboard_completion 0
 
 exit 0
