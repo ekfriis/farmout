@@ -97,6 +97,9 @@ report_completion() {
     if [ "${dboard_ExeExitCode}" = "" ]; then
         dboard_ExeExitCode=${dboard_JobExitCode}
     fi
+    if [ "${dboard_JobExitCode}" = "" ]; then
+        dboard_JobExitCode=${dboard_ExeExitCode}
+    fi
 
     required_args="ExeTime ExeExitCode"
     optional_args=""

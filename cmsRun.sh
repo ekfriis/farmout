@@ -15,7 +15,7 @@ FAIL_JOB=42
 ulimit -c 0
 
 dashboard_completion() {
-  dboard_ExeExitCode=$1
+  export dboard_ExeExitCode=$1
 
   if [ "${FARMOUT_DASHBOARD_REPORTER}" != "" ]; then
       ${FARMOUT_DASHBOARD_REPORTER} completion
@@ -103,7 +103,7 @@ start_time=`date "+%s"`
 cmsRun $jobcfg
 rc=$?
 
-dboard_ExeTime=$((`date "+%s"` -  $start_time))
+export dboard_ExeTime=$((`date "+%s"` -  $start_time))
 
 if [ "$rc" != "0" ]; then
   echo "cmsRun exited with status $rc"
