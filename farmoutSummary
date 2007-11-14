@@ -1,0 +1,221 @@
+#!/bin/bash
+#
+# Usage:
+#   farmoutSummary <jobName>
+#      or
+#   farmoutSummary all
+#
+# Lists number of jobs that had 
+# return values == 0, and also != 0
+#
+# Michael Anderson
+# www.hep.wisc.edu/~mbanderson
+# Sept 07, 2007
+
+
+farmoutDir="/scratch/$USER"
+dCacheDir="/pnfs/hep.wisc.edu/data5/uscms01/$USER"
+
+printUsage() {
+ echo 
+ echo "Usage:  farmoutSummary <jobName>"
+ echo "   or:  farmoutSummary all"
+}
+
+
+basename() {
+  # This shell function is faster than calling /bin/basename
+  path=$1
+  suffix=$2
+  path=${path##*/}  # get everything after the final '/'
+  if [ ! -z $suffix ]; then
+    path=${path%$suffix}
+  fi
+  echo $path
+}
+
+
+checkThisJob() {
+
+ dirCount=0
+ notDoneCount=0
+ goodCount=0
+ badCount=0
+ thisBaseDir=$1
+
+ echo -e `du -hs $thisBaseDir | awk '{print $1}'`"  \c"
+ echo $thisBaseDir"/"
+
+ for dir in "$thisBaseDir/"*; do
+
+  # Store the name of this directory alone
+  dir=`basename $dir`
+
+  # Make sure this is a directory
+  if [[ -d "$thisBaseDir/$dir" ]]; then   
+
+   # Increment Directory Count
+   dirCount=`expr $dirCount + 1`
+
+   # Store name of the log file
+   logFile="$thisBaseDir/$dir/$dir.log"
+
+   # Grab the return value for a terminated job
+   returnVal=`tail -12 "$logFile" | grep "termination" | awk '{print $6}' | cut -d")" -f1`
+   
+   if [[ -n "$returnVal" ]]; then
+    if [[ "$returnVal" -eq "0" ]]; then
+
+     goodCount=`expr $goodCount + 1`
+
+    else
+   
+     badCount=`expr $badCount + 1`
+
+     # Figure out the last host it ran on
+     # host=`grep "Job executing" "$logFile" | tail -1 | awk '{print $9}'` 
+
+     # Print out the returnVal from host (should be optional)
+     # echo "Return value" $returnVal "from host" $host
+    fi
+   else
+    notDoneCount=`expr $notDoneCount + 1`
+   fi
+  fi
+ done
+
+ echo -e "  "$dirCount "jobs with\c"
+ echo -e " "$goodCount "normal terminations,\c"
+ echo -e " "$badCount  "abnormal terminations, and\c"
+ echo -e " "$notDoneCount "not done."
+}
+
+
+checkAllJobs() {
+ for jobDir in "$farmoutDir/"*; do
+  if [[ -d "$jobDir" && -e "$jobDir/submit" ]]; then
+   checkThisJob $jobDir
+  fi
+ done
+}
+
+
+listAllJobs() {
+ echo "In" $farmoutDir"/ on "$HOSTNAME
+ echo -e "\n"Jobs"\t"Job Name
+
+ dirCount=0 
+
+ for jobDir in "$farmoutDir/"*; do
+  if [[ -d "$jobDir" && -e "$jobDir/submit" ]]; then
+
+   dirCount=`expr $dirCount + 1`
+
+   jobDir=`basename $jobDir`
+   #echo -e `du -hs $farmoutDir/$jobDir | awk '{print $1}'`"\c\t"
+   echo -e `ls $farmoutDir/$jobDir/ | wc | awk '{print $1}'`"\c"
+   echo -e "\t"$jobDir"\t"
+
+  fi
+ done
+
+ if [[ "$dirCount" -eq 0 ]]; then
+  echo -e "\t No available jobs."
+ fi
+}
+
+
+listCondorJobs() {
+ echo
+ echo "Currently on condor:"
+ echo `condor_q "$USER" | tail -1`
+}
+
+
+listDCacheFolders() {
+ echo
+ echo "In" $dCacheDir
+ echo ROOT
+ echo -e Files"\t"Job Name
+
+ dirCount=0
+
+ for jobDir in "$dCacheDir/"*; do
+  if [[ -d "$jobDir" ]]; then
+
+   dirCount=`expr $dirCount + 1`
+
+   jobDir=`basename $jobDir`
+   #echo -e `du -hs $dCacheDir/$jobDir | awk '{print $1}'`"\c\t"
+   echo -e `ls $dCacheDir/$jobDir/*.root | wc | awk '{print $1}'`"\c"
+   echo -e "\t"$jobDir"\t"
+
+  fi
+ done
+
+}
+
+# Looks for submit files on this machine
+# and finds if there is corresponding jobs 
+# in the dCache folder
+listSubAndOut() {
+
+ echo -e "Submit folder: \c" 
+ echo -e `du -hs $farmoutDir | awk '{print $1}'`  $HOSTNAME":"$farmoutDir
+ echo -e "Output folder:" $dCacheDir"\n"
+ echo "Submitted   Completed"
+ printf "%9s" "Jobs"
+ echo -e "   "ROOT Files"\t"Job Name
+
+ dirCount=0
+
+ for jobDir in "$farmoutDir/"*; do
+
+  jobDir=`basename $jobDir`
+
+  if [[ -d "$farmoutDir/$jobDir" && -e "$farmoutDir/$jobDir/submit" ]]; then
+
+   # We have found a submitted job on this machine & its corresponding dCacheDir
+
+   dirCount=`expr $dirCount + 1`
+
+   #jobDir=`basename $jobDir`
+   # Count just directories, this is the number of jobs submitted
+   #echo -e `ls -d $farmoutDir/$jobDir/*/        | wc | awk '{print $1}'`"\t\t\c"
+   printf "%9s" "`ls -d $farmoutDir/$jobDir/*/        | wc | awk '{print $1}'`"
+   if [[ -d "$dCacheDir/$jobDir" ]]; then
+     echo -e "   "`ls  $dCacheDir/$jobDir/*.root | wc | awk '{print $1}'`"\c" 
+   fi
+   echo -e "\t\t"$jobDir"\t"
+
+  fi
+ done
+}
+
+
+# Main method
+if [ $# -ne 1 ]; then
+
+ #listAllJobs
+ #listDCacheFolders
+ listSubAndOut
+ listCondorJobs
+ printUsage
+
+else
+
+ if [[ "$1" == "all" ]]; then
+  checkAllJobs
+ else
+  jobDir="$farmoutDir/$1"
+ 
+  # Make sure it is a valid job
+  if [[ -d "$jobDir" && -e "$jobDir/submit" ]]; then
+   checkThisJob "$jobDir"
+  else
+   echo $jobDir "is not a valid job to check!"
+   listAllJobs
+   printUsage
+  fi
+ fi
+fi
