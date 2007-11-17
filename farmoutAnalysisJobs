@@ -81,6 +81,7 @@ PrintUsage() {
   echo "  --skip-existing-jobs     (do not create jobs if job already created)"
   echo "  --match-input-files='*.root'"
   echo "  --exclude-input-files=pattern"
+  echo "  --input-file-list=file"
   echo "  --memory-requirements=$MEMORY_REQUIREMENTS (megabytes)"
   echo "  --disk-requirements=$DISK_REQUIREMENTS  (megabytes)"
   echo ""
@@ -88,7 +89,7 @@ PrintUsage() {
   exit 2
 }
 
-OPTS=`getopt -o "h" -l "help,output-dir:,input-dir:,submit-dir:,no-submit,job-count:,skip-existing-output,skip-existing-jobs,match-input-files:,exclude-input-files:,input-files-per-job:,disk-requirements:,memory-requirements:" -- "$@"`
+OPTS=`getopt -o "h" -l "help,output-dir:,input-dir:,submit-dir:,no-submit,job-count:,skip-existing-output,skip-existing-jobs,match-input-files:,exclude-input-files:,input-files-per-job:,disk-requirements:,memory-requirements:,input-file-list:" -- "$@"`
 if [ $? -ne 0 ]; then PrintUsage; fi
 
 eval set -- "$OPTS"
@@ -103,6 +104,7 @@ SUBMIT_DIR=
 MATCH_INPUT_FILES='*.root'
 EXCLUDE_INPUT_FILES=
 INPUT_FILES_PER_JOB=1
+INPUT_FILE_LIST=
 
 while [ ! -z "$1" ]
 do
@@ -121,6 +123,7 @@ do
     --input-files-per-job) shift; INPUT_FILES_PER_JOB=$1;;
     --disk-requirements) shift; DISK_REQUIREMENTS=$1;;
     --memory-requirements) shift; MEMORY_REQUIREMENTS=$1;;
+    --input-file-list) shift; INPUT_FILE_LIST=$1;;
     --) shift; break;;
     *) echo "Unexpected option $1"; PrintUsage;;
   esac
@@ -159,7 +162,13 @@ LOCAL_INPUT_DIR=${INPUT_DIR#dcap://*:22125}
 #Get the part of INPUT_DIR that was stripped off.
 INPUT_BASE=${INPUT_DIR%$LOCAL_INPUT_DIR}
 
-if ! [ -d "$LOCAL_INPUT_DIR" ]; then
+if [ "$INPUT_FILE_LIST" != "" ]; then
+    if ! [ -f "$INPUT_FILE_LIST" ]; then
+        echo "Error: No such file: $INPUT_FILE_LIST"
+        exit 1
+    fi
+    INPUT_FILE_LIST=`realpath $INPUT_FILE_LIST`
+elif ! [ -d "$LOCAL_INPUT_DIR" ]; then
   echo "Error: No such input directory: $LOCAL_INPUT_DIR"
   exit 1
 fi
@@ -283,10 +292,24 @@ if [ "$EXCLUDE_INPUT_FILES" != "" ]; then
   EXCLUDE_ARG="-not -name $EXCLUDE_INPUT_FILES"
 fi
 
+find_command="find $LOCAL_INPUT_DIR -name $MATCH_INPUT_FILES $EXCLUDE_ARG"
+
+if [ "$INPUT_FILE_LIST" != "" ]; then
+  find_command="cat $INPUT_FILE_LIST"
+  check_input_file_existence=1
+fi
+
 count=0
-find $LOCAL_INPUT_DIR -name $MATCH_INPUT_FILES $EXCLUDE_ARG |
+$find_command |
 while read firstInputFile
 do
+    if [ "$check_input_file_existence" != "" ]; then
+        if ! [ -f "$firstInputFile" ]; then
+            echo "$firstInputFile does not exist, skipping"
+            continue
+        fi
+    fi
+
     inputFileNames="\"${INPUT_BASE}/$firstInputFile\""
 
     i=$(($INPUT_FILES_PER_JOB-1))
