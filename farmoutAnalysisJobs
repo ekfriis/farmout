@@ -25,7 +25,7 @@ SRM_HOME=${SRM_SERVER}/${PNFS_HOME}
 DCAP_HOME=${DCAP_SERVER}${PNFS_HOME}
 
 DISK_REQUIREMENTS=2000
-MEMORY_REQUIREMENTS=900
+MEMORY_REQUIREMENTS=1200
 
 # special exit status to force job to leave the queue
 FAIL_JOB=42
@@ -83,7 +83,7 @@ PrintUsage() {
   echo "  --exclude-input-files=pattern"
   echo "  --input-file-list=file"
   echo "  --memory-requirements=$MEMORY_REQUIREMENTS (megabytes)"
-  echo "  --disk-requirements=$DISK_REQUIREMENTS  (megabytes)"
+  echo "  --disk-requirements=$DISK_REQUIREMENTS   (megabytes)"
   echo ""
   echo "Note that <runName> is taken from the name of the config file."
   exit 2
