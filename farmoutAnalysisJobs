@@ -309,7 +309,7 @@ fi
 find_command="find $LOCAL_INPUT_DIR -name $MATCH_INPUT_FILES $EXCLUDE_ARG"
 
 dbs_query() {
-    $DBSCMD_HOME/dbsCommandLine.py -c lsf --notwril "$@" | grep /store/
+    $DBSCMD_HOME/dbsCommandLine.py -c lsf "$@" | grep /store/
 }
 if [ "$INPUT_DBS_PATH" != "" ]; then
   find_command="dbs_query --path=$INPUT_DBS_PATH"
@@ -350,7 +350,9 @@ do
         fi
 
         i=$(($i-1))
-        read nextInputFile || break
+        if [ $i -gt 0 ]; then
+            read nextInputFile || break
+        fi
     done
     [ "inputFileNames" = "" ] && break
 
