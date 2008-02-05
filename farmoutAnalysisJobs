@@ -19,6 +19,7 @@
 # Initialize default settings:
 
 PNFS_HOME=/pnfs/hep.wisc.edu/data5/uscms01/$USER
+PNFS_STORE=/pnfs/hep.wisc.edu/data4/PA_TFC
 SRM_SERVER=srm://cmssrm.hep.wisc.edu:8443
 DCAP_SERVER=dcap://cmsdcap.hep.wisc.edu:22125
 SRM_HOME=${SRM_SERVER}/${PNFS_HOME}
@@ -73,6 +74,7 @@ PrintUsage() {
   echo "OPTIONS:"
   echo "  --output-dir=${SRM_HOME}/<jobName>-<runName>"
   echo "  --input-dir=${DCAP_HOME}/<jobName>"
+  echo "  --input-dbs-path=/dbs/dataset/path   (in place of --input-dir)"
   echo "  --submit-dir=${SUBMIT_HOME}/<jobName>-<runName>"
   echo "  --no-submit"
   echo "  --job-count=N            (limit the number of jobs that are created)"
@@ -89,7 +91,7 @@ PrintUsage() {
   exit 2
 }
 
-OPTS=`getopt -o "h" -l "help,output-dir:,input-dir:,submit-dir:,no-submit,job-count:,skip-existing-output,skip-existing-jobs,match-input-files:,exclude-input-files:,input-files-per-job:,disk-requirements:,memory-requirements:,input-file-list:" -- "$@"`
+OPTS=`getopt -o "h" -l "help,output-dir:,input-dir:,submit-dir:,no-submit,job-count:,skip-existing-output,skip-existing-jobs,match-input-files:,exclude-input-files:,input-files-per-job:,disk-requirements:,memory-requirements:,input-file-list:,input-dbs-path:" -- "$@"`
 if [ $? -ne 0 ]; then PrintUsage; fi
 
 eval set -- "$OPTS"
@@ -105,6 +107,7 @@ MATCH_INPUT_FILES='*.root'
 EXCLUDE_INPUT_FILES=
 INPUT_FILES_PER_JOB=1
 INPUT_FILE_LIST=
+INPUT_DBS_PATH=
 
 while [ ! -z "$1" ]
 do
@@ -124,6 +127,7 @@ do
     --disk-requirements) shift; DISK_REQUIREMENTS=$1;;
     --memory-requirements) shift; MEMORY_REQUIREMENTS=$1;;
     --input-file-list) shift; INPUT_FILE_LIST=$1;;
+    --input-dbs-path) shift; INPUT_DBS_PATH=$1;;
     --) shift; break;;
     *) echo "Unexpected option $1"; PrintUsage;;
   esac
@@ -152,6 +156,12 @@ configTemplate=`realpath $3`
 
 runName=`basename $configTemplate .cfg`
 
+if [ "$INPUT_DIR" = "" ]; then
+    if [ "$INPUT_FILE_LIST" != "" ] || [ "$INPUT_DBS_PATH" != "" ]; then
+        INPUT_DIR=${DCAP_SERVER}${PNFS_STORE}
+    fi
+fi
+
 OUTPUT_DIR=${OUTPUT_DIR:-${SRM_HOME}/$jobName-$runName}
 INPUT_DIR=${INPUT_DIR:-${DCAP_HOME}/$jobName}
 SUBMIT_DIR=${SUBMIT_DIR:-${SUBMIT_HOME}/$jobName-$runName}
@@ -164,13 +174,17 @@ INPUT_BASE=${INPUT_DIR%$LOCAL_INPUT_DIR}
 
 if [ "$INPUT_FILE_LIST" != "" ]; then
     if ! [ -f "$INPUT_FILE_LIST" ]; then
-        echo "Error: No such file: $INPUT_FILE_LIST"
-        exit 1
+        die "Error: No such file: $INPUT_FILE_LIST"
     fi
     INPUT_FILE_LIST=`realpath $INPUT_FILE_LIST`
 elif ! [ -d "$LOCAL_INPUT_DIR" ]; then
-  echo "Error: No such input directory: $LOCAL_INPUT_DIR"
-  exit 1
+  die "Error: No such input directory: $LOCAL_INPUT_DIR"
+fi
+
+if [ "$INPUT_DBS_PATH" != "" ]; then
+    if [ "$DBSCMD_HOME" = "" ] || ! [ -d "$DBSCMD_HOME" ]; then
+      die "DBS client is not correctly set up: DBSCMD_HOME is invalid"
+    fi
 fi
 
 if ! [ -d "$CMSSW_HOME" ]; then
@@ -294,29 +308,51 @@ fi
 
 find_command="find $LOCAL_INPUT_DIR -name $MATCH_INPUT_FILES $EXCLUDE_ARG"
 
+dbs_query() {
+    $DBSCMD_HOME/dbsCommandLine.py -c lsf --notwril "$@" | grep /store/
+}
+if [ "$INPUT_DBS_PATH" != "" ]; then
+  find_command="dbs_query --path=$INPUT_DBS_PATH"
+  check_input_file_existence=1
+  prepend_local_input_dir=1
+fi
+
 if [ "$INPUT_FILE_LIST" != "" ]; then
   find_command="cat $INPUT_FILE_LIST"
   check_input_file_existence=1
+  prepend_local_input_dir=1
 fi
 
 count=0
 $find_command |
-while read firstInputFile
+while read nextInputFile
 do
-    if [ "$check_input_file_existence" != "" ]; then
-        if ! [ -f "$firstInputFile" ]; then
-            echo "$firstInputFile does not exist, skipping"
-            continue
+    inputFileNames=""
+    i=$INPUT_FILES_PER_JOB
+    while [ $i -gt 0 ]; do
+        if [ "$prepend_local_input_dir" = 1 ]; then
+            nextInputFile="${LOCAL_INPUT_DIR}${nextInputFile}"
         fi
-    fi
 
-    inputFileNames="\"${INPUT_BASE}/$firstInputFile\""
+        if [ "$check_input_file_existence" != "" ]; then
+            if ! [ -f "$nextInputFile" ]; then
+                echo "$nextInputFile does not exist, skipping"
+		read nextInputFile || break
+                continue
+            fi
+        fi
 
-    i=$(($INPUT_FILES_PER_JOB-1))
-    while [ $i -gt 0 ] && read nextInputFile; do
+        if [ "$inputFileNames" = "" ]; then
+            inputFileNames="\"${INPUT_BASE}/$nextInputFile\""
+            firstInputFile="${nextInputFile}"
+        else
+            inputFileNames="${inputFileNames},\"${INPUT_BASE}/$nextInputFile\""
+        fi
+
         i=$(($i-1))
-        inputFileNames="${inputFileNames},\"${INPUT_BASE}/$nextInputFile\""
+        read nextInputFile || break
     done
+    [ "inputFileNames" = "" ] && break
 
 #
 # Name the files
