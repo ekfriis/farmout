@@ -179,6 +179,11 @@ for macro in \$randomNumber \$nEventsPerJob \$outputFileName; do
   fi
 done
 
+# Note: reverse sort order is _very_ important, or the search/replace
+# operation will do the long thing on longer macros having a common
+# prefix with a shorter macro.
+randomMacros=`grep -o '\$randomNumber[0-9]*' $configTemplate | sort -r | uniq`
+
 #
 # Environment setup
 #
@@ -281,14 +286,6 @@ while (( $nEvents > $nEventsSubmitted )); do
       continue
     fi
 
-    conlog=$jobtag.log
-    stdout=$jobtag.out
-    stderr=$jobtag.err
-    jobcfg=$jobtag.cfg
-    outputFileName=$jobtag.root
-    randomNumber=`date +%N%S | cut -c 1-6,10- | sed 's|^0*||'`
-    randomNumber2=`date +%N%S | cut -c 2-6,9- | sed 's|^0*||'`
-
     if [ "$SKIP_EXISTING_OUTPUT" = "1" ]; then
       # Check for existing output file
       if outputFileExists $OUTPUT_DIR/$outputFileName; then
@@ -296,6 +293,20 @@ while (( $nEvents > $nEventsSubmitted )); do
       fi
     fi
 
+    conlog=$jobtag.log
+    stdout=$jobtag.out
+    stderr=$jobtag.err
+    jobcfg=$jobtag.cfg
+    outputFileName=$jobtag.root
+
+    randomSed=""
+    # Note: we rely here upon the reverse sort order of the randomMacros
+    # in order to assure proper treatment of macros that share a common
+    # prefix (e.g. randomNumber11 should be replaced before randomNumber1)
+    for randomMacro in $randomMacros; do
+        randomNumber=`date +%N%S | cut -c 1-6,10- | sed 's|^0*||'`
+        randomSed="${randomSed}s/\\${randomMacro}/${randomNumber}/g;"
+    done
 
 #
 # Create the job subdirectory
@@ -307,8 +318,7 @@ while (( $nEvents > $nEventsSubmitted )); do
 #
 
 sed < $configTemplate \
-  "s|\\\$randomNumber|$randomNumber|g;
-   s|\\\$randomNumber2|$randomNumber2|g;
+  "${randomSed}
    s|\\\$nEventsPerJob|$nEventsPerJob|g;
    s|\\\$outputFileName|$outputFileName|g" > $jobtag/$jobcfg
 
