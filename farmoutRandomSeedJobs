@@ -136,6 +136,7 @@ if [ "$#" -ne 5 ]; then PrintUsage; fi
 # Check for some required utilities
 for exe in scramv1 condor_submit cmsRun.sh realpath voms-proxy-info; do
   if ! which $exe >& /dev/null; then
+    echo
     echo "Cannot find $exe in PATH.  Your environment is not correctly set up."
     exit 1
   fi
@@ -152,6 +153,7 @@ configTemplate=`realpath $5`
 #       Ensure that your environment is correct
 
 if ! [ -d "$CMSSW_HOME" ]; then
+  echo
   echo "No such directory: $CMSSW_HOME"
   exit 1
 fi
@@ -171,6 +173,7 @@ fi
 
 for macro in \$randomNumber \$nEventsPerJob \$outputFileName; do
   if ! grep -F -q $macro $configTemplate; then
+    echo
     echo "$macro must appear on the configuration template.  I can't find it in $configTemplate"
     exit 1
   fi
@@ -186,6 +189,7 @@ cd $CMSSW_HOME || die "Failed to cd to $CMSSW_HOME."
 eval `scramv1 runtime -sh`
 
 if [ "$?" != "0" ]; then
+  echo
   echo "Failed to initialize CMSSW environment with scram in $CMSSW_HOME."
   exit 1
 fi
@@ -195,7 +199,9 @@ SUBMIT_DIR=${SUBMIT_DIR:-${SUBMIT_HOME}/$jobName}
 submitFile=$SUBMIT_DIR/submit
 
 if [ -d "$SUBMIT_DIR" ] && [ "$SKIP_EXISTING_JOBS" != "1" ]; then
+  echo
   echo "Error: Submit directory already exists: $SUBMIT_DIR"
+  echo
   echo "You must either remove it, or specify --skip-existing-jobs, or"
   echo "specify a different job name or submission directory with --submit-dir"
   exit 1
