@@ -170,6 +170,7 @@ if [ "$#" -ne 3 ]; then PrintUsage; fi
 # Check for some required utilities
 for exe in scramv1 condor_submit cmsRun.sh realpath voms-proxy-info; do
   if ! which $exe >& /dev/null; then
+    echo
     echo "Cannot find $exe in PATH.  Your environment is not correctly set up."
     exit 1
   fi
@@ -218,12 +219,15 @@ if [ "$INPUT_DBS_PATH" != "" ]; then
 fi
 
 if ! [ -d "$CMSSW_HOME" ]; then
+  echo
   echo "Error: No such CMSSW directory: $CMSSW_HOME"
   exit 1
 fi
 
 if [ -d "$SUBMIT_DIR" ] && [ "$SKIP_EXISTING_JOBS" != "1" ]; then
+  echo
   echo "Error: Submit directory already exists: $SUBMIT_DIR"
+  echo
   echo "You must either remove it, or specify --skip-existing-jobs, or"
   echo "specify a different job name or submission directory with --submit-dir"
   exit 1
@@ -244,6 +248,7 @@ fi
 
 for macro in \$inputFileNames \$outputFileName; do
   if ! grep -F -q $macro $configTemplate; then
+    echo
     echo "$macro must appear on the configuration template.  I can't find it in $configTemplate"
     exit 1
   fi
@@ -259,6 +264,7 @@ cd $CMSSW_HOME || die "Failed to cd to $CMSSW_HOME."
 eval `scramv1 runtime -sh`
 
 if [ "$?" != "0" ]; then
+  echo
   echo "Failed to initialize CMSSW environment with scram in $CMSSW_HOME."
   exit 1
 fi
@@ -393,7 +399,7 @@ do
             read nextInputFile || break
         fi
     done
-    [ "inputFileNames" = "" ] && break
+    [ "$inputFileNames" = "" ] && break
 
 #
 # Name the files
@@ -444,14 +450,14 @@ do
 # Prepare job configuration file
 #
 
-sed < $configTemplate \
-    "s|\\\$inputFileNames|$inputFileNames|g;
-     s|\\\$outputFileName|$outputFileName|g" > $jobcfg
+    sed < $configTemplate \
+        "s|\\\$inputFileNames|$inputFileNames|g;
+         s|\\\$outputFileName|$outputFileName|g" > $jobcfg
 
 #
 # Prepare condor submit file for the job
 #
-cat >> $submitFile <<EOF
+    cat >> $submitFile <<EOF
 
 InitialDir           = $jobtag
 Arguments            = $jobcfg `basename $outputFileName` $OUTPUT_DIR
