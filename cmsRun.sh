@@ -118,6 +118,14 @@ if [ "$rc" != "0" ]; then
   exit $FAIL_JOB
 fi
 
+if ! [ -f $datafile ]; then
+  echo "cmsRun did not produce expected datafile $datafile"
+  echo "ls -ltr"
+  ls -ltr
+  echo "End of ls output"
+  exit $FAIL_JOB
+fi
+
 # load environment for using srmcp
 source $OSG_SETUP
 
