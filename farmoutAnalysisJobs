@@ -123,12 +123,13 @@ PrintUsage() {
   echo "  --disk-requirements=$DISK_REQUIREMENTS   (megabytes)"
   echo "  --save-failed-datafiles  (save root file from failed cmsRun job)"
   echo "                           (in <output-dir>-cmsRun-failed)"
+  echo "  --save-missing-input-file-list=file"
   echo ""
   echo "Note that <runName> is taken from the name of the config file."
   exit 2
 }
 
-OPTS=`getopt -o "h" -l "help,output-dir:,input-dir:,submit-dir:,no-submit,job-count:,skip-existing-output,skip-existing-jobs,match-input-files:,exclude-input-files:,input-files-per-job:,disk-requirements:,memory-requirements:,input-file-list:,input-dbs-path:,save-failed-datafiles" -- "$@"`
+OPTS=`getopt -o "h" -l "help,output-dir:,input-dir:,submit-dir:,no-submit,job-count:,skip-existing-output,skip-existing-jobs,match-input-files:,exclude-input-files:,input-files-per-job:,disk-requirements:,memory-requirements:,input-file-list:,input-dbs-path:,save-failed-datafiles,save-missing-input-file-list:" -- "$@"`
 if [ $? -ne 0 ]; then PrintUsage; fi
 
 eval set -- "$OPTS"
@@ -146,6 +147,7 @@ INPUT_FILES_PER_JOB=1
 INPUT_FILE_LIST=
 INPUT_DBS_PATH=
 SAVE_FAILED_DATAFILES=
+SAVE_MISSING_INPUT_FILE_LIST=
 
 while [ ! -z "$1" ]
 do
@@ -167,6 +169,7 @@ do
     --input-file-list) shift; INPUT_FILE_LIST=$1;;
     --input-dbs-path) shift; INPUT_DBS_PATH=$1;;
     --save-failed-datafiles) SAVE_FAILED_DATAFILES=1;;
+    --save-missing-input-file-list) shift; SAVE_MISSING_INPUT_FILE_LIST=$1;;
     --) shift; break;;
     *) die "Unexpected option $1";;
   esac
@@ -380,6 +383,7 @@ do
     inputFileNames=""
     i=$INPUT_FILES_PER_JOB
     while [ $i -gt 0 ]; do
+        nextInputFileOrigName="${nextInputFile}"
         if [ "$prepend_local_input_dir" = 1 ]; then
             nextInputFile="${LOCAL_INPUT_DIR}${nextInputFile}"
         fi
@@ -387,6 +391,11 @@ do
         if [ "$check_input_file_existence" != "" ]; then
             if ! [ -f "$nextInputFile" ]; then
                 echo "$nextInputFile does not exist, skipping"
+
+                if [ "$SAVE_MISSING_INPUT_FILE_LIST" != "" ]; then
+                    echo "$nextInputFileOrigName" >> "$SAVE_MISSING_INPUT_FILE_LIST"
+                fi
+
 		read nextInputFile || break
                 continue
             fi
