@@ -41,8 +41,13 @@ if ! [ -d $scratch_dir ]; then
 fi
 SUBMIT_HOME=${scratch_dir}/$USER
 
+logerror() {
+  echo 2>&1 "$@"
+}
+
 die() {
-  echo 2>&1 $1
+  logerror
+  logerror "$@"
   exit 1
 }
 
@@ -62,9 +67,7 @@ check_proxy() {
   hours=$1
   proxy=$2
   if ! [ -f "$proxy" ]; then
-    echo
-    echo "NOTE: No grid proxy found.  (Expecting to find it here: $proxy.)"
-    return 1
+    die "NOTE: No grid proxy found.  (Expecting to find it here: $proxy.)"
   fi
 
   #Issue a warning if less than this many seconds remain:
@@ -78,9 +81,9 @@ check_proxy() {
     return 0
   fi
   if [ "$seconds_left" -lt "$min_proxy_lifetime" ]; then
-    echo
-    echo "NOTE: grid proxy is about to expire:"
-    echo "voms-proxy-info"
+    logerror
+    logerror "NOTE: grid proxy is about to expire:"
+    logerror "voms-proxy-info"
     voms-proxy-info --file=$proxy
     return 1
   fi
@@ -126,7 +129,7 @@ do
     --disk-requirements) shift; DISK_REQUIREMENTS=$1;;
     --memory-requirements) shift; MEMORY_REQUIREMENTS=$1;;
     --) shift; break;;
-    *) echo "Unexpected option $1"; PrintUsage;;
+    *) die "Unexpected option $1";;
   esac
   shift
 done
@@ -136,9 +139,7 @@ if [ "$#" -ne 5 ]; then PrintUsage; fi
 # Check for some required utilities
 for exe in scramv1 condor_submit cmsRun.sh realpath voms-proxy-info; do
   if ! which $exe >& /dev/null; then
-    echo
-    echo "Cannot find $exe in PATH.  Your environment is not correctly set up."
-    exit 1
+    die "Cannot find $exe in PATH.  Your environment is not correctly set up."
   fi
 done
 
@@ -153,19 +154,17 @@ configTemplate=`realpath $5`
 #       Ensure that your environment is correct
 
 if ! [ -d "$CMSSW_HOME" ]; then
-  echo
-  echo "No such directory: $CMSSW_HOME"
-  exit 1
+  die "No such directory: $CMSSW_HOME"
 fi
 
 proxy=${X509_USER_PROXY:-/tmp/x509up_u$UID}
 
 if [ "$NO_SUBMIT" != 1 ] && ! check_proxy $MIN_PROXY_HOURS $proxy; then
-  echo
-  echo "Either rerun this command with --no-submit or create a new grid proxy"
-  echo "and rerun this command.  Example of how to create a grid proxy:"
-  echo
-  echo "voms-proxy-init --voms=cms --hours=48"
+  logerror
+  logerror "Either rerun this command with --no-submit or create a new grid proxy"
+  logerror "and rerun this command.  Example of how to create a grid proxy:"
+  logerror
+  logerror "voms-proxy-init --voms=cms --hours=48"
   exit 1
 fi
 
@@ -173,9 +172,7 @@ fi
 
 for macro in \$randomNumber \$nEventsPerJob \$outputFileName; do
   if ! grep -F -q $macro $configTemplate; then
-    echo
-    echo "$macro must appear on the configuration template.  I can't find it in $configTemplate"
-    exit 1
+    die "$macro must appear on the configuration template.  I can't find it in $configTemplate"
   fi
 done
 
@@ -194,9 +191,7 @@ cd $CMSSW_HOME || die "Failed to cd to $CMSSW_HOME."
 eval `scramv1 runtime -sh`
 
 if [ "$?" != "0" ]; then
-  echo
-  echo "Failed to initialize CMSSW environment with scram in $CMSSW_HOME."
-  exit 1
+  die "Failed to initialize CMSSW environment with scram in $CMSSW_HOME."
 fi
 
 OUTPUT_DIR=${OUTPUT_DIR:-${SRM_HOME}/$jobName}
@@ -204,11 +199,11 @@ SUBMIT_DIR=${SUBMIT_DIR:-${SUBMIT_HOME}/$jobName}
 submitFile=$SUBMIT_DIR/submit
 
 if [ -d "$SUBMIT_DIR" ] && [ "$SKIP_EXISTING_JOBS" != "1" ]; then
-  echo
-  echo "Error: Submit directory already exists: $SUBMIT_DIR"
-  echo
-  echo "You must either remove it, or specify --skip-existing-jobs, or"
-  echo "specify a different job name or submission directory with --submit-dir"
+  logerror
+  logerror "Error: Submit directory already exists: $SUBMIT_DIR"
+  logerror
+  logerror "You must either remove it, or specify --skip-existing-jobs, or"
+  logerror "specify a different job name or submission directory with --submit-dir"
   exit 1
 fi
 
@@ -229,7 +224,7 @@ if [ "$FARMOUT_DASHBOARD_REPORTER" = "" ]; then
    echo "No farmout_dashboard.sh found, so no reporting to the CMS dashboard."
 fi
 if [ "$CMS_DASHBOARD_REPORTER" = "" ]; then
-   echo No CMS_DASHBOARD_REPORTER defined, so no reporting to the CMS dashboard.
+   echo "No CMS_DASHBOARD_REPORTER defined, so no reporting to the CMS dashboard."
 fi
 dboard="
 dboard_taskId=${USER}-`hostname -f`-\$(Cluster)
