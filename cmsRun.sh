@@ -5,6 +5,7 @@ jobcfg=$1
 datafile=$2
 SRM_OUTPUT_DIR=$3
 SRM_OUTPUT_FILE="$SRM_OUTPUT_DIR/$datafile"
+SRM_FAILED_OUTPUT_FILE="${SRM_OUTPUT_DIR}-cmsRun-failed/${datafile}"
 OSG_SETUP=/afs/hep.wisc.edu/cms/sw/osg/setup.sh
 
 # special exit status to force job to leave the queue
@@ -105,11 +106,21 @@ rc=$?
 
 export dboard_ExeTime=$((`date "+%s"` -  $start_time))
 
+echo "ls -ltr"
+ls -ltr
+echo "End of ls output"
+
+# load environment for using srmcp
+source $OSG_SETUP
+
 if [ "$rc" != "0" ]; then
   echo "cmsRun exited with status $rc"
-  if [ -f $datafile ]; then
-    mv $datafile cmsRun_failed_$datafile
+  if [ -f $datafile ] && [ "$SAVE_FAILED_DATAFILES" = "1" ]; then
+    if ! DoSrmcp "file://localhost/`pwd`/$datafile" "$SRM_FAILED_OUTPUT_FILE"; then
+      echo "Failed to save datafile from failed run."
+    fi
   fi
+  rm -f $datafile
 
   dashboard_completion $rc
 
@@ -120,14 +131,8 @@ fi
 
 if ! [ -f $datafile ]; then
   echo "cmsRun did not produce expected datafile $datafile"
-  echo "ls -ltr"
-  ls -ltr
-  echo "End of ls output"
   exit $FAIL_JOB
 fi
-
-# load environment for using srmcp
-source $OSG_SETUP
 
 if ! DoSrmcp "file://localhost/`pwd`/$datafile" "$SRM_OUTPUT_FILE"; then
   dashboard_completion 60307

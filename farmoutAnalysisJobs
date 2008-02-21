@@ -121,12 +121,14 @@ PrintUsage() {
   echo "  --input-file-list=file"
   echo "  --memory-requirements=$MEMORY_REQUIREMENTS (megabytes)"
   echo "  --disk-requirements=$DISK_REQUIREMENTS   (megabytes)"
+  echo "  --save-failed-datafiles  (save root file from failed cmsRun job)"
+  echo "                           (in <output-dir>-cmsRun-failed)"
   echo ""
   echo "Note that <runName> is taken from the name of the config file."
   exit 2
 }
 
-OPTS=`getopt -o "h" -l "help,output-dir:,input-dir:,submit-dir:,no-submit,job-count:,skip-existing-output,skip-existing-jobs,match-input-files:,exclude-input-files:,input-files-per-job:,disk-requirements:,memory-requirements:,input-file-list:,input-dbs-path:" -- "$@"`
+OPTS=`getopt -o "h" -l "help,output-dir:,input-dir:,submit-dir:,no-submit,job-count:,skip-existing-output,skip-existing-jobs,match-input-files:,exclude-input-files:,input-files-per-job:,disk-requirements:,memory-requirements:,input-file-list:,input-dbs-path:,save-failed-datafiles" -- "$@"`
 if [ $? -ne 0 ]; then PrintUsage; fi
 
 eval set -- "$OPTS"
@@ -143,6 +145,7 @@ EXCLUDE_INPUT_FILES=
 INPUT_FILES_PER_JOB=1
 INPUT_FILE_LIST=
 INPUT_DBS_PATH=
+SAVE_FAILED_DATAFILES=
 
 while [ ! -z "$1" ]
 do
@@ -163,6 +166,7 @@ do
     --memory-requirements) shift; MEMORY_REQUIREMENTS=$1;;
     --input-file-list) shift; INPUT_FILE_LIST=$1;;
     --input-dbs-path) shift; INPUT_DBS_PATH=$1;;
+    --save-failed-datafiles) SAVE_FAILED_DATAFILES=1;;
     --) shift; break;;
     *) die "Unexpected option $1";;
   esac
@@ -318,6 +322,10 @@ FARMOUT_DASHBOARD_REPORTER=${FARMOUT_DASHBOARD_REPORTER}
 # convert newlines to spaces
 dboard="`echo $dboard`"
 
+if [ "$SAVE_FAILED_DATAFILES" != "" ]; then
+  #cmsRun.sh checks for this in the environment
+  save_failed_datafiles_env="SAVE_FAILED_DATAFILES=1"
+fi
 
 # First put all the submit file commands that are the same for all jobs.
     cat <<EOF > $submitFile
@@ -325,7 +333,7 @@ X509UserProxy        = ${proxy}
 Universe             = vanilla
 Executable           = $Executable
 GetEnv               = true
-Environment          = "${dboard}"
+Environment          = "${dboard} ${save_failed_datafiles_env}"
 Copy_To_Spool        = false
 Notification         = never
 WhenToTransferOutput = On_Exit
