@@ -136,6 +136,7 @@ for dir; do
       rc=$?
       if [ "$rc" != 0 ]; then
         desc="status $rc"
+	rm -f $dest_fname
         if [ "$rc" = "142" ]; then
           desc="timed out after $COPY_TIMEOUT seconds"
         fi
