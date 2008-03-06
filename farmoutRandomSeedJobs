@@ -13,7 +13,7 @@
 # inserted by this script:
 #
 # $randomNumber
-# $randomNumber2
+# $randomNumberN where N is any unique number
 # $nEventsPerJob
 # $outputFileName
 
