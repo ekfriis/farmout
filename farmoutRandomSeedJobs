@@ -161,6 +161,13 @@ if ! [ -d "$CMSSW_HOME" ]; then
   die "No such directory: $CMSSW_HOME"
 fi
 
+# randomize
+if [ "$RANDOM" = "" ]; then
+  die "\$RANDOM is not working.  Are you using bash?"
+fi
+RANDOM=`date +%N | cut -c 1-6 | sed 's|^0*||'`
+echo $RANDOM
+
 proxy=${X509_USER_PROXY:-/tmp/x509up_u$UID}
 
 if [ "$NO_SUBMIT" != 1 ] && ! check_proxy $MIN_PROXY_HOURS $proxy; then
@@ -307,7 +314,7 @@ while (( $nEvents > $nEventsSubmitted )); do
     # in order to assure proper treatment of macros that share a common
     # prefix (e.g. randomNumber11 should be replaced before randomNumber1)
     for randomMacro in $randomMacros; do
-        randomNumber=`date +%N%S | cut -c 1-6,10- | sed 's|^0*||'`
+        randomNumber=${RANDOM}
         randomSed="${randomSed}s/\\${randomMacro}/${randomNumber}/g;"
     done
 
