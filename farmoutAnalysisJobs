@@ -453,6 +453,10 @@ do
     count=$(($count+1))
     if [ ! -z $JOB_LIMIT ] && [ $count -gt $JOB_LIMIT ]; then
         echo "Job limit $JOB_LIMIT reached.  Halting creation of jobs."
+
+        # eat up rest of input to avoid broken pipe message
+        while read junk; do junk=""; done
+
         break
     fi
     echo -n "."
