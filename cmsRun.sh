@@ -15,6 +15,10 @@ FAIL_JOB=42
 # so disable them.
 ulimit -c 0
 
+# load environment for using srmcp
+source $OSG_SETUP
+
+
 dashboard_completion() {
   export dboard_ExeExitCode=$1
 
@@ -102,7 +106,7 @@ fi
 start_time=`date "+%s"`
 
 cmsRun $jobcfg
-rc=$?
+cmsRun_rc=$?
 
 export dboard_ExeTime=$((`date "+%s"` -  $start_time))
 
@@ -110,11 +114,8 @@ echo "ls -ltr"
 ls -ltr
 echo "End of ls output"
 
-# load environment for using srmcp
-source $OSG_SETUP
-
-if [ "$rc" != "0" ]; then
-  echo "cmsRun exited with status $rc"
+if [ "$cmsRun_rc" != "0" ]; then
+  echo "cmsRun exited with status $cmsRun_rc"
   if [ -f $datafile ] && [ "$SAVE_FAILED_DATAFILES" = "1" ]; then
     if ! DoSrmcp "file://localhost/`pwd`/$datafile" "$SRM_FAILED_OUTPUT_FILE"; then
       echo "Failed to save datafile from failed run."
@@ -122,7 +123,7 @@ if [ "$rc" != "0" ]; then
   fi
   rm -f $datafile
 
-  dashboard_completion $rc
+  dashboard_completion $cmsRun_rc
 
   # Do not try to run this job again.  Would be nice to detect transient
   # errors (e.g. dCache down) and retry in those cases.
