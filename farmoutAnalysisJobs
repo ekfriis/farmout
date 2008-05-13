@@ -18,13 +18,19 @@
 
 # Initialize default settings:
 
-PNFS_HOME=/pnfs/hep.wisc.edu/data5/uscms01/$USER
-PNFS_STORE=/pnfs/hep.wisc.edu/data4/PA_TFC
+# for storing output
 SRM_SERVER=srm://cmssrm.hep.wisc.edu:8443
+PNFS_HOME=/pnfs/hep.wisc.edu/data5/uscms01/$USER
+
+# for getting input
 DCAP_SERVER=dcap://cmsdcap.hep.wisc.edu:22125
+# path to directory containing lfns: /store/...
+PNFS_STORE=/pnfs/hep.wisc.edu/data4/PA_TFC
+
 SRM_HOME=${SRM_SERVER}/${PNFS_HOME}
 DCAP_HOME=${DCAP_SERVER}${PNFS_HOME}
 
+SITE_REQUIREMENTS='TARGET.HasAFS_OSG =?= True && TARGET.OSRedHatRelease =!= "Scientific Linux SL Release 3.0.4 (SL)"'
 DISK_REQUIREMENTS=2000
 MEMORY_REQUIREMENTS=1200
 MIN_PROXY_HOURS=24
@@ -50,6 +56,10 @@ basename() {
     path=${path%$suffix}
   fi
   echo $path
+}
+
+realpath() {
+  readlink -f $1
 }
 
 logerror() {
@@ -121,15 +131,17 @@ PrintUsage() {
   echo "  --input-file-list=file"
   echo "  --memory-requirements=$MEMORY_REQUIREMENTS (megabytes)"
   echo "  --disk-requirements=$DISK_REQUIREMENTS   (megabytes)"
+  echo "  --site-requirements=$SITE_REQUIREMENTS"
   echo "  --save-failed-datafiles  (save root file from failed cmsRun job)"
   echo "                           (in <output-dir>-cmsRun-failed)"
   echo "  --save-missing-input-file-list=file"
+  echo "  --assume-input-files-exist (do not check file existence at submit time)"
   echo ""
   echo "Note that <runName> is taken from the name of the config file."
   exit 2
 }
 
-OPTS=`getopt -o "h" -l "help,output-dir:,input-dir:,submit-dir:,no-submit,job-count:,skip-existing-output,skip-existing-jobs,match-input-files:,exclude-input-files:,input-files-per-job:,disk-requirements:,memory-requirements:,input-file-list:,input-dbs-path:,save-failed-datafiles,save-missing-input-file-list:" -- "$@"`
+OPTS=`getopt -o "h" -l "help,output-dir:,input-dir:,submit-dir:,no-submit,job-count:,skip-existing-output,skip-existing-jobs,match-input-files:,exclude-input-files:,input-files-per-job:,disk-requirements:,memory-requirements:,input-file-list:,input-dbs-path:,save-failed-datafiles,save-missing-input-file-list:,assume-input-files-exist,site-requirements:" -- "$@"`
 if [ $? -ne 0 ]; then PrintUsage; fi
 
 eval set -- "$OPTS"
@@ -148,6 +160,7 @@ INPUT_FILE_LIST=
 INPUT_DBS_PATH=
 SAVE_FAILED_DATAFILES=
 SAVE_MISSING_INPUT_FILE_LIST=
+ASSUME_INPUT_FILES_EXIST=
 
 while [ ! -z "$1" ]
 do
@@ -170,6 +183,8 @@ do
     --input-dbs-path) shift; INPUT_DBS_PATH=$1;;
     --save-failed-datafiles) SAVE_FAILED_DATAFILES=1;;
     --save-missing-input-file-list) shift; SAVE_MISSING_INPUT_FILE_LIST=$1;;
+    --assume-input-files-exist) ASSUME_INPUT_FILES_EXIST=0;;
+    --site-requirements) shift; SITE_REQUIREMENTS="$1";;
     --) shift; break;;
     *) die "Unexpected option $1";;
   esac
@@ -180,7 +195,7 @@ if [ "$#" -ne 3 ]; then PrintUsage; fi
 
 
 # Check for some required utilities
-for exe in scramv1 condor_submit cmsRun.sh realpath voms-proxy-info; do
+for exe in scramv1 condor_submit cmsRun.sh readlink voms-proxy-info; do
   if ! which $exe >& /dev/null; then
     die "Cannot find $exe in PATH.  Your environment is not correctly set up."
   fi
@@ -344,7 +359,7 @@ on_exit_remove       = (ExitBySignal == FALSE && (ExitCode == 0 || (ExitCode == 
 +IsFastQueueJob      = True
 ImageSize            = $(($MEMORY_REQUIREMENTS*1000))
 +DiskUsage           = $(($DISK_REQUIREMENTS*1000))
-Requirements = TARGET.HasAFS_OSG =?= True && TARGET.OSRedHatRelease =!= "Scientific Linux SL Release 3.0.4 (SL)"
+Requirements         = ${SITE_REQUIREMENTS}
 EOF
 
 
@@ -366,13 +381,13 @@ dbs_query() {
 }
 if [ "$INPUT_DBS_PATH" != "" ]; then
   find_command="dbs_query --path=$INPUT_DBS_PATH"
-  check_input_file_existence=1
+  check_input_file_existence=${ASSUME_INPUT_FILES_EXIST:-1}
   prepend_local_input_dir=1
 fi
 
 if [ "$INPUT_FILE_LIST" != "" ]; then
   find_command="cat $INPUT_FILE_LIST"
-  check_input_file_existence=1
+  check_input_file_existence=${ASSUME_INPUT_FILES_EXIST:-1}
   prepend_local_input_dir=1
 fi
 
@@ -388,7 +403,7 @@ do
             nextInputFile="${LOCAL_INPUT_DIR}${nextInputFile}"
         fi
 
-        if [ "$check_input_file_existence" != "" ]; then
+        if [ "$check_input_file_existence" = "1" ]; then
             if ! [ -f "$nextInputFile" ]; then
                 echo "$nextInputFile does not exist, skipping"
 

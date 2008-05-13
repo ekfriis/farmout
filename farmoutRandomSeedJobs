@@ -19,12 +19,13 @@
 
 # Initialize default settings:
 
-PNFS_HOME=/pnfs/hep.wisc.edu/data5/uscms01/$USER
+# for storing output
 SRM_SERVER=srm://cmssrm.hep.wisc.edu:8443
-DCAP_SERVER=dcap://cmsdcap.hep.wisc.edu:22125
-SRM_HOME=${SRM_SERVER}/${PNFS_HOME}
-DCAP_HOME=${DCAP_SERVER}${PNFS_HOME}
+PNFS_HOME=/pnfs/hep.wisc.edu/data5/uscms01/$USER
 
+SRM_HOME=${SRM_SERVER}/${PNFS_HOME}
+
+SITE_REQUIREMENTS='TARGET.HasAFS_OSG =?= True && TARGET.OSRedHatRelease =!= "Scientific Linux SL Release 3.0.4 (SL)"'
 DISK_REQUIREMENTS=2000
 MEMORY_REQUIREMENTS=900
 MIN_PROXY_HOURS=24
@@ -61,6 +62,10 @@ outputFileExists() {
     return 0
   fi
   return 1
+}
+
+realpath() {
+  readlink -f $1
 }
 
 check_proxy() {
@@ -101,13 +106,14 @@ PrintUsage() {
   echo "  --skip-existing-jobs    (do not create job if already created)"
   echo "  --memory-requirements=$MEMORY_REQUIREMENTS (megabytes)"
   echo "  --disk-requirements=$DISK_REQUIREMENTS  (megabytes)"
+  echo "  --site-requirements=$SITE_REQUIREMENTS"
   echo "  --save-failed-datafiles  (save root file from failed cmsRun job)"
   echo "                           (in <output-dir>-cmsRun-failed)"
   echo ""
   exit 2
 }
 
-OPTS=`getopt -o "h" -l "help,output-dir:,submit-dir:,no-submit,skip-existing-output,skip-existing-jobs,disk-requirements:,memory-requirements:,save-failed-datafiles" -- "$@"`
+OPTS=`getopt -o "h" -l "help,output-dir:,submit-dir:,no-submit,skip-existing-output,skip-existing-jobs,disk-requirements:,memory-requirements:,save-failed-datafiles,site-requirements:" -- "$@"`
 if [ $? -ne 0 ]; then PrintUsage; fi
 
 eval set -- "$OPTS"
@@ -132,6 +138,7 @@ do
     --disk-requirements) shift; DISK_REQUIREMENTS=$1;;
     --memory-requirements) shift; MEMORY_REQUIREMENTS=$1;;
     --save-failed-datafiles) SAVE_FAILED_DATAFILES=1;;
+    --site-requirements) shift; SITE_REQUIREMENTS="$1";;
     --) shift; break;;
     *) die "Unexpected option $1";;
   esac
@@ -141,7 +148,7 @@ done
 if [ "$#" -ne 5 ]; then PrintUsage; fi
 
 # Check for some required utilities
-for exe in scramv1 condor_submit cmsRun.sh realpath voms-proxy-info; do
+for exe in scramv1 condor_submit cmsRun.sh readlink voms-proxy-info; do
   if ! which $exe >& /dev/null; then
     die "Cannot find $exe in PATH.  Your environment is not correctly set up."
   fi
@@ -273,7 +280,7 @@ WhenToTransferOutput = On_Exit
 on_exit_remove       = (ExitBySignal == FALSE && (ExitCode == 0 || (ExitCode == ${FAIL_JOB} && JobRunCount>3)))
 ImageSize            = $(($MEMORY_REQUIREMENTS*1000))
 +DiskUsage           = $(($DISK_REQUIREMENTS*1000))
-Requirements = TARGET.HasAFS_OSG =?= True && TARGET.OSRedHatRelease =!= "Scientific Linux SL Release 3.0.4 (SL)"
+Requirements         = ${SITE_REQUIREMENTS}
 EOF
 
 
