@@ -65,6 +65,9 @@ outputFileExists() {
 }
 
 realpath() {
+  if ! [ -a "$1" ]; then
+    echo "$1"
+  fi
   readlink -f $1
 }
 
@@ -124,6 +127,7 @@ SUBMIT_DIR=
 SKIP_EXISTING_OUTPUT=
 SKIP_EXISTING_JOBS=
 SAVE_FAILED_DATAFILES=
+CFG_EXTENSION=
 
 while [ ! -z "$1" ]
 do
@@ -173,7 +177,6 @@ if [ "$RANDOM" = "" ]; then
   die "\$RANDOM is not working.  Are you using bash?"
 fi
 RANDOM=`date +%N | cut -c 1-6 | sed 's|^0*||'`
-echo $RANDOM
 
 proxy=${X509_USER_PROXY:-/tmp/x509up_u$UID}
 
@@ -187,6 +190,15 @@ if [ "$NO_SUBMIT" != 1 ] && ! check_proxy $MIN_PROXY_HOURS $proxy; then
 fi
 
 # Check the config template
+
+if [ "$configTemplate" = "" ]; then
+  die "You must specify a cfg template."
+fi
+
+CFG_EXTENSION="${configTemplate/*./}"
+if [ "$CFG_EXTENSION" != "py" ] && [ "$CFG_EXTENSION" != "cfg" ]; then
+  die "cfg template must end in .py or .cfg"
+fi
 
 for macro in \$randomNumber \$nEventsPerJob \$outputFileName; do
   if ! grep -F -q $macro $configTemplate; then
@@ -313,7 +325,7 @@ while (( $nEvents > $nEventsSubmitted )); do
     conlog=$jobtag.log
     stdout=$jobtag.out
     stderr=$jobtag.err
-    jobcfg=$jobtag.cfg
+    jobcfg=$jobtag.$CFG_EXTENSION
     outputFileName=$jobtag.root
 
     randomSed=""
