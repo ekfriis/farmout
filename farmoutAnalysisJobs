@@ -59,6 +59,9 @@ basename() {
 }
 
 realpath() {
+  if ! [ -a "$1" ]; then
+    echo "$1"
+  fi
   readlink -f $1
 }
 
@@ -268,6 +271,10 @@ if [ "$NO_SUBMIT" != 1 ] && ! check_proxy $MIN_PROXY_HOURS $proxy; then
 fi
 
 # Check the config template
+
+if [ "$configTemplate" = "" ]; then
+  die "You must specify a cfg template."
+fi
 
 for macro in \$inputFileNames \$outputFileName; do
   if ! grep -F -q $macro $configTemplate; then
