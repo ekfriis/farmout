@@ -6,7 +6,11 @@ datafile=$2
 SRM_OUTPUT_DIR=$3
 SRM_OUTPUT_FILE="$SRM_OUTPUT_DIR/$datafile"
 SRM_FAILED_OUTPUT_FILE="${SRM_OUTPUT_DIR}-cmsRun-failed/${datafile}"
-OSG_SETUP=/afs/hep.wisc.edu/cms/sw/osg/setup.sh
+if [ "$OSG_GRID" != "" ]; then
+  OSG_SETUP=$OSG_GRID/setup.sh
+else
+  OSG_SETUP=/afs/hep.wisc.edu/osg/wnclient/setup.sh
+fi
 
 # special exit status to force job to leave the queue
 FAIL_JOB=42
