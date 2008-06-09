@@ -125,13 +125,19 @@ for dir; do
   if [ "$EXCLUDE_INPUT_FILES" != "" ]; then
     EXCLUDE_OPTION="-not -name $EXCLUDE_INPUT_FILES"
   fi
+
+  TOTAL_FILES=`find $dir -type f -name "$MATCH_INPUT_FILES" $EXCLUDE_OPTION | wc --lines`
+  CURRENT_FILE=1
+
   find $dir -type f -name "$MATCH_INPUT_FILES" $EXCLUDE_OPTION |
   while read fname; do
     dest_fname=${CACHE_DIR}/`basename $fname`
     if [ -s $dest_fname ]; then
       echo "Already in local cache: `basename $fname`."
     else
-      echo "Copying `basename $fname` to local cache."
+      echo "(${CURRENT_FILE}/${TOTAL_FILES}): Copying `basename $fname` to local cache."
+      let "CURRENT_FILE += 1"
+
       $TIMEOUT_CMD dccp $fname $dest_fname
       rc=$?
       if [ "$rc" != 0 ]; then
