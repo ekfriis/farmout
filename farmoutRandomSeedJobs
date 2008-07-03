@@ -112,11 +112,12 @@ PrintUsage() {
   echo "  --site-requirements=$SITE_REQUIREMENTS"
   echo "  --save-failed-datafiles  (save root file from failed cmsRun job)"
   echo "                           (in <output-dir>-cmsRun-failed)"
+  echo "  --quick-test             (require low latency scheduling)"
   echo ""
   exit 2
 }
 
-OPTS=`getopt -o "h" -l "help,output-dir:,submit-dir:,no-submit,skip-existing-output,skip-existing-jobs,disk-requirements:,memory-requirements:,save-failed-datafiles,site-requirements:" -- "$@"`
+OPTS=`getopt -o "h" -l "help,output-dir:,submit-dir:,no-submit,skip-existing-output,skip-existing-jobs,disk-requirements:,memory-requirements:,save-failed-datafiles,site-requirements:,quick-test" -- "$@"`
 if [ $? -ne 0 ]; then PrintUsage; fi
 
 eval set -- "$OPTS"
@@ -128,6 +129,7 @@ SKIP_EXISTING_OUTPUT=
 SKIP_EXISTING_JOBS=
 SAVE_FAILED_DATAFILES=
 CFG_EXTENSION=
+QUICK_TEST=
 
 while [ ! -z "$1" ]
 do
@@ -143,6 +145,7 @@ do
     --memory-requirements) shift; MEMORY_REQUIREMENTS=$1;;
     --save-failed-datafiles) SAVE_FAILED_DATAFILES=1;;
     --site-requirements) shift; SITE_REQUIREMENTS="$1";;
+    --quick-test) QUICK_TEST=1;;
     --) shift; break;;
     *) die "Unexpected option $1";;
   esac
@@ -246,6 +249,11 @@ cd $SUBMIT_DIR || die "Failed to create directory $SUBMIT_DIR"
 #
 Executable=`which cmsRun.sh`
 
+if [ "$QUICK_TEST" != "" ]; then
+  IS_FAST_QUEUE_JOB="+IsFastQueueJob = True"
+  SITE_REQUIREMENTS="${SITE_REQUIREMENTS} && IsFastQueueSlot =?= True"
+fi
+
 #
 # CMS Dashboard parameters
 #
@@ -292,6 +300,7 @@ WhenToTransferOutput = On_Exit
 on_exit_remove       = (ExitBySignal == FALSE && (ExitCode == 0 || (ExitCode == ${FAIL_JOB} && JobRunCount>3)))
 ImageSize            = $(($MEMORY_REQUIREMENTS*1000))
 +DiskUsage           = $(($DISK_REQUIREMENTS*1000))
+${IS_FAST_QUEUE_JOB}
 Requirements         = ${SITE_REQUIREMENTS}
 EOF
 

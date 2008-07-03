@@ -139,12 +139,13 @@ PrintUsage() {
   echo "                           (in <output-dir>-cmsRun-failed)"
   echo "  --save-missing-input-file-list=file"
   echo "  --assume-input-files-exist (do not check file existence at submit time)"
+  echo "  --quick-test             (require low latency scheduling)"
   echo ""
   echo "Note that <runName> is taken from the name of the config file."
   exit 2
 }
 
-OPTS=`getopt -o "h" -l "help,output-dir:,input-dir:,submit-dir:,no-submit,job-count:,skip-existing-output,skip-existing-jobs,match-input-files:,exclude-input-files:,input-files-per-job:,disk-requirements:,memory-requirements:,input-file-list:,input-dbs-path:,save-failed-datafiles,save-missing-input-file-list:,assume-input-files-exist,site-requirements:" -- "$@"`
+OPTS=`getopt -o "h" -l "help,output-dir:,input-dir:,submit-dir:,no-submit,job-count:,skip-existing-output,skip-existing-jobs,match-input-files:,exclude-input-files:,input-files-per-job:,disk-requirements:,memory-requirements:,input-file-list:,input-dbs-path:,save-failed-datafiles,save-missing-input-file-list:,assume-input-files-exist,site-requirements:,quick-test" -- "$@"`
 if [ $? -ne 0 ]; then PrintUsage; fi
 
 eval set -- "$OPTS"
@@ -165,6 +166,7 @@ SAVE_FAILED_DATAFILES=
 SAVE_MISSING_INPUT_FILE_LIST=
 ASSUME_INPUT_FILES_EXIST=
 CFG_EXTENSION=
+QUICK_TEST=
 
 while [ ! -z "$1" ]
 do
@@ -189,6 +191,7 @@ do
     --save-missing-input-file-list) shift; SAVE_MISSING_INPUT_FILE_LIST=$1;;
     --assume-input-files-exist) ASSUME_INPUT_FILES_EXIST=0;;
     --site-requirements) shift; SITE_REQUIREMENTS="$1";;
+    --quick-test) QUICK_TEST=1;;
     --) shift; break;;
     *) die "Unexpected option $1";;
   esac
@@ -326,6 +329,9 @@ cd $runDir || die "Failed to create directory $runDir"
 #
 Executable=`which cmsRun.sh`
 
+if [ "$QUICK_TEST" != "" ]; then
+  SITE_REQUIREMENTS="${SITE_REQUIREMENTS} && IsFastQueueSlot =?= True"
+fi
 
 #
 # CMS Dashboard parameters
