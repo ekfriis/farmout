@@ -1,0 +1,24 @@
+#!/bin/bash
+#
+# Just writes # jobs on condor to a log file
+#
+# Use:
+#  updateJobLog <userName>
+# example:
+#  updateJobLog mbanderson
+
+if [ $# -eq 2 ]; then
+  userToMonitor=$1
+  logFile=$2
+else
+  userToMonitor=$USER
+  logFile="/afs/hep.wisc.edu/home/$USER/jobMonitor.log"
+fi
+
+# This will look something like: "10 jobs; 1 idle, 8 running, 1 held"
+jobString=`condor_q $userToMonitor | tail -1`
+
+# This writes a string to the log file that looks like
+#   <hour> <min> <total> <idle> <running> <held>
+# example: "15 36 10 1 8 1"
+echo `date +%H\ %M`" "`echo $jobString | awk '{print $1" "$3" "$5" "$7}'` >> $logFile

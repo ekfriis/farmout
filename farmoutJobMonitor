@@ -1,0 +1,68 @@
+#!/bin/bash
+#
+# Essentially this runs condor_q <screen name>
+# once every minute and stores that in a log file.
+# Then runs a script to create a plot of that log file.
+#
+# Michael Anderson
+# May 19, 2008
+##################################################
+
+
+logFile="/afs/hep.wisc.edu/home/$USER/jobMonitor.log"
+
+# Check number of arguments given
+if [ $# -eq 1 ]; then
+  userToWatch=$1
+else
+  userToWatch=$USER
+fi
+
+##################################################
+# See if the log file already exists
+# it means jobMonitor already ran, which
+# is ok, but we need to make sure it isn't
+# still running.
+if [ -f "$logFile" ]; then
+ # Logfile exists, check to see if jobMonitor is already running
+ lastPID=`head -1 $logFile | awk '{print $2}'`
+ checkRunning=`ps -p $lastPID | grep $lastPID`
+ if [ "$checkRunning"  ]; then
+  #jobMonitor is already running, so don't run again
+  exit
+ fi
+fi
+##################################################
+
+
+##################################################
+# Make the user's web dir if it doesn't exist
+mkdir -p /afs/hep.wisc.edu/home/mbanderson/$USER/www
+
+# Create new log file
+echo "#PID $$" > $logFile
+echo "#Log of jobs running on condor" >> $logFile
+echo "#Started: "`date` >> $logFile
+echo "#Hour Min TotalJobs IdleJobs RunningJobs HeldJobs" >> $logFile
+##################################################
+
+
+##################################################
+# Run for 1 day (1440 minutes)
+for ((i=0;i<=1440;i+=1)); do 
+
+  # Update the log file containing jobs running, etc...
+  /cms/cmsprod/bin/updateJobLog $USER $logFile
+
+  # Run the plot updater every 5 minutes
+  if [ $((i % 5)) -eq 0 ]; then
+    #farmoutSummary gives useful info that can be
+    # placed on the webpage.
+    /cms/cmsprod/bin/farmoutSummary > /tmp/farmoutSummary.log
+    /cms/cmsprod/bin/updateJobMonitorGraph.pl
+  fi
+
+  # Sleep for 60 seconds
+  sleep 60
+done
+##################################################

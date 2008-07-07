@@ -140,12 +140,13 @@ PrintUsage() {
   echo "  --save-missing-input-file-list=file"
   echo "  --assume-input-files-exist (do not check file existence at submit time)"
   echo "  --quick-test             (require low latency scheduling)"
+  echo "  --no-monitor             (disable monitoring)"
   echo ""
   echo "Note that <runName> is taken from the name of the config file."
   exit 2
 }
 
-OPTS=`getopt -o "h" -l "help,output-dir:,input-dir:,submit-dir:,no-submit,job-count:,skip-existing-output,skip-existing-jobs,match-input-files:,exclude-input-files:,input-files-per-job:,disk-requirements:,memory-requirements:,input-file-list:,input-dbs-path:,save-failed-datafiles,save-missing-input-file-list:,assume-input-files-exist,site-requirements:,quick-test" -- "$@"`
+OPTS=`getopt -o "h" -l "help,output-dir:,input-dir:,submit-dir:,no-submit,job-count:,skip-existing-output,skip-existing-jobs,match-input-files:,exclude-input-files:,input-files-per-job:,disk-requirements:,memory-requirements:,input-file-list:,input-dbs-path:,save-failed-datafiles,save-missing-input-file-list:,assume-input-files-exist,site-requirements:,quick-test,no-monitor" -- "$@"`
 if [ $? -ne 0 ]; then PrintUsage; fi
 
 eval set -- "$OPTS"
@@ -167,6 +168,7 @@ SAVE_MISSING_INPUT_FILE_LIST=
 ASSUME_INPUT_FILES_EXIST=
 CFG_EXTENSION=
 QUICK_TEST=
+MONITOR=farmoutJobMonitor
 
 while [ ! -z "$1" ]
 do
@@ -192,6 +194,7 @@ do
     --assume-input-files-exist) ASSUME_INPUT_FILES_EXIST=0;;
     --site-requirements) shift; SITE_REQUIREMENTS="$1";;
     --quick-test) QUICK_TEST=1;;
+    --no-monitor) MONITOR="";;
     --) shift; break;;
     *) die "Unexpected option $1";;
   esac
@@ -202,7 +205,7 @@ if [ "$#" -ne 3 ]; then PrintUsage; fi
 
 
 # Check for some required utilities
-for exe in scramv1 condor_submit cmsRun.sh readlink voms-proxy-info; do
+for exe in scramv1 condor_submit cmsRun.sh readlink voms-proxy-info "${MONITOR}"; do
   if ! which $exe >& /dev/null; then
     die "Cannot find $exe in PATH.  Your environment is not correctly set up."
   fi
@@ -548,3 +551,12 @@ fi
 echo -n "Jobs for $jobName are created in "
 pwd
 cd $originalDir
+
+# Start the jobMonitor (runs in background for 1 day)
+# Michael Anderson, July 5 2008
+if [ "$MONITOR" != "" ]; then
+  nohup ${MONITOR} > /dev/null &
+  echo "Monitor your jobs at"
+  echo "http://www.hep.wisc.edu/~$USER/jobMonitor.php"
+fi
+
