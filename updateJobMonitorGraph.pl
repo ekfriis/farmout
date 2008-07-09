@@ -11,19 +11,19 @@
 # Set variables for the locations and 
 # names of all the files.
 $user = $ENV{'USER'};
-$homeDir = "/afs/hep.wisc.edu/home/$user/";
+$homeDir = "/afs/hep.wisc.edu/home/$user";
 $logfile = "$homeDir/jobMonitor.log";
 
 # The webpage and gif file will be placed in webDir
-$webDir = "$homeDir/www/";
+$webDir = "$homeDir/www";
 $webPage = "jobMonitor.php";
-$giffile = "jobMonitor.gif";
-$webSiteAddr = "http://www.hep.wisc.edu/~$user/$webPage";
+$imgFile = "jobMonitor.png";
 
 # Temp files and executable locations
 $datafile = "/tmp/gnuplot_$$.dat";
 $gpfile = "/tmp/gnuplot_$$.gp";
-$GNUPLOT = "gnuplot";
+#$GNUPLOT = "gnuplot";
+$GNUPLOT = "/afs/hep.wisc.edu/cms/sw/gnuplot/bin/gnuplot";
 $PPMTOGIF = "ppmtogif";
 $farmoutSumLog = "/tmp/farmoutSummary.log";
 ##################################################
@@ -50,83 +50,97 @@ $date = sprintf ("%02d/%s/%d", $day, $mon, $year);
 # example:
 # 15 36 100 36 64 0
 open (LOGFILE, "< $logfile");
-while ($hi = <LOGFILE>) {
+while ($currentLine = <LOGFILE>) {
 
-  # Read this line
-  ($inhour, $inmin, $totalJobs, $jobsIdle, $jobsRunning, $jobsHeld) = split (" ", $hi);
-  $hr_percent = ($inmin/60) * 100;
-  $index = int($inhour * 100 + $hr_percent);
-  # Read in from file and set the variables
-  $totalJobsArray[$index]   = $totalJobs;
-  $jobsIdleArray[$index]    = $jobsIdle;
-  $jobsRunningArray[$index] = $jobsRunning;
-  $jobsHeldArray[$index]    = $jobsHeld;
+  if ($currentLine =~ m/^[0-9]/) {
 
-  # Count the total number of lines
-  $total++;
+    # Read this line
+    ($inhour, $inmin, $totalJobs, $jobsIdle, $jobsRunning, $jobsHeld) = split (" ", $currentLine);
+    $hr_percent = ($inmin/60) * 100;
+    $index = int($inhour * 100 + $hr_percent);
+
+
+    if ($total==0) { $beginHour=$inhour; }
+    # Read in from file and set the variables
+    $totalJobsArray[$index]   = $totalJobs;
+    $jobsIdleArray[$index]    = $jobsIdle;
+    $jobsRunningArray[$index] = $jobsRunning;
+    $jobsHeldArray[$index]    = $jobsHeld;
+
+    # Count the total number of lines
+    $total++;
+
+  }
 }
+$lastHour=$inhour;
 close LOGFILE;
 ##################################################
 
 
 ##################################################
-# SECTION 4:
+# SECTION 4:     PERHAPS DEFUNCT
+# Process the data file and put it into a format
+# gnuplot can use.
 # Write the data file that gnuplot will use. 
-open (DATAFILE, "> $datafile");
-printf (DATAFILE "#HourMin\tTotalJobs\tIdleJobs\tRunningJobs\tHeldJobs\n");
-for ($i=0; $i <= 2400; $i++) {
-    if (defined ($totalJobsArray[$i])) {
-	printf (DATAFILE "%04d\t%d\t%d\t%d\t%d\n", $i, $totalJobsArray[$i], $jobsIdleArray[$i], $jobsRunningArray[$i], $jobsHeldArray[$i]);
-    } else {
-	printf (DATAFILE "%04d\t0\t0\t0\t0\n", $i);
-    }
-}
-close DATAFILE;
-##################################################
-
-
-##################################################
+#open (DATAFILE, "> $datafile");
+#printf (DATAFILE "# HourMin TotalJobs IdleJobs RunningJobs HeldJobs\n");
+#for ($i=0; $i <= 2400; $i++) {
+#    if (defined ($totalJobsArray[$i])) {
+#	printf (DATAFILE "%04d\t%d\t%d\t%d\t%d\n", $i, $totalJobsArray[$i], $jobsIdleArray[$i], $jobsRunningArray[$i], $jobsHeldArray[$i]);
+#    } else {
+#	printf (DATAFILE "%04d\t0\t0\t0\t0\n", $i);
+#    }
+#}
+#close DATAFILE;
 # SECTION 5:
-# Write the gnuplot command file.
-# Define custom tic marks for the x axis.
-for ($i=0; $i <=24; $i++) {
-  if ($i == 12) {
-    $xtics = sprintf ("%s\"%s\" %d,", 
-		       $xtics, "Noon", $i*100);
-  } else {
-    $xtics = sprintf ("%s\"%02d\" %d,", 
-		       $xtics, $i, $i*100);
-  }
-}
-chop $xtics;
-open (GPFILE, "> $gpfile");
+# Create the custom xtics
+#for ($i=0; $i <=24; $i++) {
+#  if ($i == 12) {
+#    $xtics = sprintf ("%s\"%s\" %d,", 
+#		       $xtics, "Noon", $i*100);
+#  } else {
+#    $xtics = sprintf ("%s\"%02d\" %d,", 
+#		       $xtics, $i, $i*100);
+#  }
+#}
+#chop $xtics;
+##################################################
 
+
+##################################################
+# Write the gnuplot command file
+open (GPFILE, "> $gpfile");
 # Everything after the following line up to the
 # terminating "EOM" line defines the contents of
 # the gnuplot command file.
 print GPFILE <<EOM;
-set term pbm color
-set offsets
+set terminal png transparent nocrop enhanced size 620,280
+set output '$webDir/$imgFile'
 set nolog
-set nopolar
-set border
 set grid
 set title "Jobs on $mon $day, $year (updated $hour:$min)"
 set xlabel "Time (Hours)"
 set ylabel "Number of Jobs"
-set size 1.20, 0.50
-set xtics ($xtics)
-set key outside
+set key reverse Left outside
+#set key autotitle columnheader
+set style data histogram
+set style histogram rowstacked
+set style fill solid 1.00 noborder
+set boxwidth 4.0
+#set xtics ($xtics)
+set xdata time
+set timefmt "%H:%M"
+set format x "%H:%M"
 # Main plot command
-plot "$datafile" using 1:2 title 'Total Jobs' with points,  "$datafile" using 1:3 title 'Idle' with points, "$datafile" using 1:4 title 'Running' with lines, "$datafile" using 1:5 title 'Held' with points
+plot "$logfile" using 1:2 title 'Total' with boxes,  '' using 1:3 title 'Idle' with boxes, '' using 1:4 title 'Running' with boxes, '' using 1:5 title 'Held' with boxes
 EOM
 close GPFILE;
 
 ##################################################
 # SECTION 6:
-# Run gnuplot, and convert the output to gif
-# format.
-system ("$GNUPLOT $gpfile | $PPMTOGIF 2> /dev/null > $webDir/$giffile");
+# Run gnuplot with the above created command file
+system ("$GNUPLOT $gpfile");
+#system ("$GNUPLOT $gpfile | $PPMTOGIF 2> /dev/null > $webDir/$imgFile");
 #Now delete the gnuplot command and data file
 #unlink ($gpfile, $datafile);
 ##################################################
@@ -141,12 +155,12 @@ system ("$GNUPLOT $gpfile | $PPMTOGIF 2> /dev/null > $webDir/$giffile");
 open (WEBPAGE, "> $webDir/$webPage");
 print WEBPAGE <<EOM;
 <HTML>
-<head>
+<HEAD>
  <title>Job Monitoring</title>
  <LINK REL="SHORTCUT ICON" HREF="http://www.hep.wisc.edu/cms/comp/cmsIcon.ico">
-</head>
+</HEAD>
 <BODY>
-<CENTER><IMG SRC=$giffile></CENTER>
+<CENTER><IMG SRC=$imgFile></CENTER>
 <hr>
 <h2>Info on jobs submitted by farmoutAnalysisJobs:</h2>
 <pre>
