@@ -10,6 +10,9 @@
 
 
 logFile="/afs/hep.wisc.edu/home/$USER/jobMonitor.log"
+# length of time to run this monitor (in minutes)
+timeToMonitor=720
+
 
 # Check number of arguments given
 if [ $# -eq 1 ]; then
@@ -48,8 +51,8 @@ echo "#Hour Min TotalJobs IdleJobs RunningJobs HeldJobs" >> $logFile
 
 
 ##################################################
-# Run for 1 day (1440 minutes)
-for ((i=0;i<=1440;i+=1)); do 
+# Run for a certain number of minutes
+for ((i=0;i<=$timeToMonitor;i+=1)); do 
 
   # Update the log file containing jobs running, etc...
   /cms/cmsprod/bin/updateJobLog $USER $logFile
