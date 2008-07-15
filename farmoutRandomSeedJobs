@@ -113,11 +113,12 @@ PrintUsage() {
   echo "  --save-failed-datafiles  (save root file from failed cmsRun job)"
   echo "                           (in <output-dir>-cmsRun-failed)"
   echo "  --quick-test             (require low latency scheduling)"
+  echo "  --extra-inputs=file1,file2,...  (e.g. parameter files)"
   echo ""
   exit 2
 }
 
-OPTS=`getopt -o "h" -l "help,output-dir:,submit-dir:,no-submit,skip-existing-output,skip-existing-jobs,disk-requirements:,memory-requirements:,save-failed-datafiles,site-requirements:,quick-test" -- "$@"`
+OPTS=`getopt -o "h" -l "help,output-dir:,submit-dir:,no-submit,skip-existing-output,skip-existing-jobs,disk-requirements:,memory-requirements:,save-failed-datafiles,site-requirements:,quick-test,extra-inputs:" -- "$@"`
 if [ $? -ne 0 ]; then PrintUsage; fi
 
 eval set -- "$OPTS"
@@ -130,6 +131,7 @@ SKIP_EXISTING_JOBS=
 SAVE_FAILED_DATAFILES=
 CFG_EXTENSION=
 QUICK_TEST=
+EXTRA_INPUTS=
 
 while [ ! -z "$1" ]
 do
@@ -146,6 +148,7 @@ do
     --save-failed-datafiles) SAVE_FAILED_DATAFILES=1;;
     --site-requirements) shift; SITE_REQUIREMENTS="$1";;
     --quick-test) QUICK_TEST=1;;
+    --extra-inputs) shift; EXTRA_INPUTS="$1";;
     --) shift; break;;
     *) die "Unexpected option $1";;
   esac
@@ -190,6 +193,15 @@ if [ "$NO_SUBMIT" != 1 ] && ! check_proxy $MIN_PROXY_HOURS $proxy; then
   logerror
   logerror "voms-proxy-init --voms=cms --hours=48"
   exit 1
+fi
+
+if [ "$EXTRA_INPUTS" != "" ]; then
+  for file in ${EXTRA_INPUTS//,/ }; do
+    if ! [ -a $file ]; then
+      logerror "ERROR: Cannot find file specified in --extra-inputs: $file"
+      exit 1
+    fi
+  done
 fi
 
 # Check the config template
@@ -336,6 +348,10 @@ while (( $nEvents > $nEventsSubmitted )); do
     stderr=$jobtag.err
     jobcfg=$jobtag.$CFG_EXTENSION
     outputFileName=$jobtag.root
+    inputfiles="$jobcfg"
+    if [ "$EXTRA_INPUTS" != "" ]; then
+      inputfiles="$jobcfg,$EXTRA_INPUTS"
+    fi
 
     randomSed=""
     # Note: we rely here upon the reverse sort order of the randomMacros
@@ -367,7 +383,7 @@ sed < $configTemplate \
 
 InitialDir           = $jobtag
 Arguments            = $jobcfg $outputFileName $OUTPUT_DIR
-Transfer_Input_Files = $jobcfg
+Transfer_Input_Files = $inputfiles
 output               = $stdout
 error                = $stderr
 Log                  = $conlog

@@ -141,12 +141,13 @@ PrintUsage() {
   echo "  --assume-input-files-exist (do not check file existence at submit time)"
   echo "  --quick-test             (require low latency scheduling)"
   echo "  --no-monitor             (disable monitoring)"
+  echo "  --extra-inputs=file1,file2,...  (e.g. parameter files)"
   echo ""
   echo "Note that <runName> is taken from the name of the config file."
   exit 2
 }
 
-OPTS=`getopt -o "h" -l "help,output-dir:,input-dir:,submit-dir:,no-submit,job-count:,skip-existing-output,skip-existing-jobs,match-input-files:,exclude-input-files:,input-files-per-job:,disk-requirements:,memory-requirements:,input-file-list:,input-dbs-path:,save-failed-datafiles,save-missing-input-file-list:,assume-input-files-exist,site-requirements:,quick-test,no-monitor" -- "$@"`
+OPTS=`getopt -o "h" -l "help,output-dir:,input-dir:,submit-dir:,no-submit,job-count:,skip-existing-output,skip-existing-jobs,match-input-files:,exclude-input-files:,input-files-per-job:,disk-requirements:,memory-requirements:,input-file-list:,input-dbs-path:,save-failed-datafiles,save-missing-input-file-list:,assume-input-files-exist,site-requirements:,quick-test,no-monitor,extra-inputs:" -- "$@"`
 if [ $? -ne 0 ]; then PrintUsage; fi
 
 eval set -- "$OPTS"
@@ -169,6 +170,8 @@ ASSUME_INPUT_FILES_EXIST=
 CFG_EXTENSION=
 QUICK_TEST=
 MONITOR=farmoutJobMonitor
+EXTRA_INPUTS=
+
 
 while [ ! -z "$1" ]
 do
@@ -195,6 +198,7 @@ do
     --site-requirements) shift; SITE_REQUIREMENTS="$1";;
     --quick-test) QUICK_TEST=1;;
     --no-monitor) MONITOR="";;
+    --extra-inputs) shift; EXTRA_INPUTS="$1";;
     --) shift; break;;
     *) die "Unexpected option $1";;
   esac
@@ -218,6 +222,15 @@ CMSSW_HOME=`realpath $2`
 configTemplate=`realpath $3`
 
 # Now we have all the user's input.
+
+if [ "$EXTRA_INPUTS" != "" ]; then
+  for file in ${EXTRA_INPUTS//,/ }; do
+    if ! [ -a $file ]; then
+      logerror "ERROR: Cannot find file specified in --extra-inputs: $file"
+      exit 1
+    fi
+  done
+fi
 
 # Check the config template
 
@@ -470,6 +483,10 @@ do
     stderr=$jobtag.err
     jobcfg=$jobtag.$CFG_EXTENSION
     outputFileName=$jobtag.root
+    inputfiles="$jobcfg"
+    if [ "$EXTRA_INPUTS" != "" ]; then
+      inputfiles="$jobcfg,$EXTRA_INPUTS"
+    fi
 
 #
 # Create and set to the job subdirectory
@@ -518,7 +535,7 @@ do
 
 InitialDir           = $jobtag
 Arguments            = $jobcfg `basename $outputFileName` $OUTPUT_DIR
-Transfer_Input_Files = $jobcfg
+Transfer_Input_Files = $inputfiles
 output               = $stdout
 error                = $stderr
 Log                  = $conlog
