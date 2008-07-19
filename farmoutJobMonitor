@@ -56,8 +56,8 @@ for ((i=0;i<=$maxTimeToMonitor;i+=1)); do
   # example: "15:36 10 1 8 1"
   echo `date +%H:%M`" "`echo $jobString | awk '{print $1" "$3" "$5" "$7}'` >> $logFile
 
-  # Run the plot updater every 5 minutes
-  if [ $((i % 5)) -eq 1 ]; then
+  # Run the plot updater every 2 minutes
+  if [ $((i % 2)) -eq 1 ]; then
     #farmoutSummary gives useful info that can be
     # placed on the webpage.
     /cms/cmsprod/bin/farmoutSummary > /tmp/farmoutSummary.log
@@ -71,6 +71,6 @@ for ((i=0;i<=$maxTimeToMonitor;i+=1)); do
   fi
 
   # Sleep for 60 seconds
-  sleep 60
+  sleep 59.5
 done
 ##################################################
