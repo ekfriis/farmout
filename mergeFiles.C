@@ -160,7 +160,8 @@ void InitMergeObjects( TDirectory *target, TFile *source ) {
       MergeObjects.Add(new TObjString(pathname),h2);
     }
     else if ( obj->IsA()->InheritsFrom( "TTree" ) ) {
-        TChain *ch = new TChain(obj_name);
+        //TChain *ch = new TChain(obj_name); // Not quite right. Mike Anderson Julyl 1 2008
+        TChain *ch = new TChain(pathname);
         MergeChains.Add(new TObjString(pathname),ch);
 
         ch->Add(source->GetName());
