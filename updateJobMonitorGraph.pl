@@ -23,7 +23,7 @@ $imgFile = "jobMonitor.png";
 $gpfile = "/tmp/gnuplot_$$.gp";
 #$GNUPLOT = "gnuplot";
 $GNUPLOT = "/afs/hep.wisc.edu/cms/sw/gnuplot/bin/gnuplot";
-$farmoutSumLog = "/tmp/farmoutSummary.log";
+$farmoutSumLog = "/tmp/$user-farmoutSummary.log";
 ##################################################
 
 
@@ -98,6 +98,7 @@ EOM
 close WEBPAGE;
 
 # Farmout Summary information
+system ("farmoutSummary > $farmoutSumLog");
 system ("cat $farmoutSumLog >> $webDir/$webPage");
 
 # Bottom half of web page
