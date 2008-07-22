@@ -51,6 +51,7 @@ for ((i=0;i<=$maxTimeToMonitor;i+=1)); do
   # This will look something like: 
   #   "10 jobs; 1 idle, 8 running, 1 held"
   jobString="`condor_q $USER | tail -1`"
+  totalJobs=`echo $jobString | awk '{print $1}'`
   # This writes a string to the log file that looks like
   #   <hour>:<min> <total> <idle> <running> <held>
   # example: "15:36 10 1 8 1"
@@ -58,16 +59,22 @@ for ((i=0;i<=$maxTimeToMonitor;i+=1)); do
 
   # Run the plot updater every 2 minutes
   if [ $((i % 2)) -eq 1 ]; then
+
     /cms/cmsprod/bin/updateJobMonitorGraph.pl
+
+    # If there are no jobs left, quit
+    if [ "$totalJobs" -eq 0 ]; then
+      exit
+    fi
+
+    # It takes a little bit for the updater to finish, 
+    # so sleep less than normal.
+    sleep 59
+
+  else
+    # Sleep for 60 seconds
+    sleep 60
   fi
 
-  # If there are no jobs left, quit
-  totalJobs=`echo $jobString | awk '{print $1}'`
-  if [ "$totalJobs" -eq 0 ]; then
-    exit
-  fi
-
-  # Sleep for 60 seconds
-  sleep 59.5
 done
 ##################################################
