@@ -15,9 +15,9 @@ maxTimeToMonitor=720
 
 
 ##################################################
-# See if the log file already exists
-# it means jobMonitor already ran, which
-# is ok, but we need to make sure it isn't
+# See if the log file already exists.
+# If true, this means jobMonitor already ran, 
+# which is ok, but we need to make sure it isn't
 # still running.
 if [ -f "$logFile" ]; then
  # Logfile exists, check to see if jobMonitor is already running
@@ -58,9 +58,6 @@ for ((i=0;i<=$maxTimeToMonitor;i+=1)); do
 
   # Run the plot updater every 2 minutes
   if [ $((i % 2)) -eq 1 ]; then
-    #farmoutSummary gives useful info that can be
-    # placed on the webpage.
-    /cms/cmsprod/bin/farmoutSummary > /tmp/farmoutSummary.log
     /cms/cmsprod/bin/updateJobMonitorGraph.pl
   fi
 
