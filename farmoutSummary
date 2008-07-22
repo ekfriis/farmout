@@ -12,17 +12,23 @@
 # www.hep.wisc.edu/~mbanderson
 # Sept 07, 2007
 
-
+##################################################
 farmoutDir="/scratch/$USER"
 dCacheDir="/pnfs/hep.wisc.edu/data5/uscms01/$USER"
+##################################################
 
+
+##################################################
 printUsage() {
  echo 
- echo "Usage:  farmoutSummary <jobName>"
- echo "   or:  farmoutSummary all"
+ echo "For more information:"
+ echo "  farmoutSummary <jobName>"
+ echo "  farmoutSummary all"
 }
+##################################################
 
 
+##################################################
 basename() {
   # This shell function is faster than calling /bin/basename
   path=$1
@@ -33,8 +39,10 @@ basename() {
   fi
   echo $path
 }
+##################################################
 
 
+##################################################
 checkThisJob() {
 
  dirCount=0
@@ -89,8 +97,10 @@ checkThisJob() {
  echo -e " "$badCount  "abnormal terminations, and\c"
  echo -e " "$notDoneCount "not done."
 }
+##################################################
 
 
+##################################################
 checkAllJobs() {
  for jobDir in "$farmoutDir/"*; do
   if [[ -d "$jobDir" && -e "$jobDir/submit" ]]; then
@@ -98,8 +108,10 @@ checkAllJobs() {
   fi
  done
 }
+##################################################
 
 
+##################################################
 listAllJobs() {
  echo "In" $farmoutDir"/ on "$HOSTNAME
  echo -e "\n"Jobs"\t"Job Name
@@ -125,13 +137,16 @@ listAllJobs() {
 }
 
 
+##################################################
 listCondorJobs() {
- echo
  echo "Currently on condor:"
  echo `condor_q "$USER" | tail -1`
+ echo
 }
+##################################################
 
 
+##################################################
 listDCacheFolders() {
  echo
  echo "In" $dCacheDir
@@ -154,15 +169,18 @@ listDCacheFolders() {
  done
 
 }
+##################################################
 
+
+##################################################
 # Looks for submit files on this machine
 # and finds if there is corresponding jobs 
 # in the dCache folder
 listSubAndOut() {
 
- echo -e "Submit folder: \c" 
- echo -e `du -hs $farmoutDir | awk '{print $1}'`  $HOSTNAME":"$farmoutDir
- echo -e "Output folder:" $dCacheDir"\n"
+ echo -e "Submit folder: $HOSTNAME:$farmoutDir   \c" 
+ echo -e `du -hs $farmoutDir | awk '{print $1}'`
+ echo -e "Output folder:  $dCacheDir\n"
  echo "Submitted   Completed"
  printf "%9s" "Jobs"
  echo -e "   "ROOT Files"\t"Job Name
@@ -191,15 +209,17 @@ listSubAndOut() {
   fi
  done
 }
+##################################################
 
 
+##################################################
 # Main method
 if [ $# -ne 1 ]; then
 
  #listAllJobs
  #listDCacheFolders
- listSubAndOut
  listCondorJobs
+ listSubAndOut
  printUsage
 
 else
