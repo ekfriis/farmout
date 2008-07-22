@@ -113,12 +113,13 @@ PrintUsage() {
   echo "  --save-failed-datafiles  (save root file from failed cmsRun job)"
   echo "                           (in <output-dir>-cmsRun-failed)"
   echo "  --quick-test             (require low latency scheduling)"
+  echo "  --no-monitor             (disable monitoring)"
   echo "  --extra-inputs=file1,file2,...  (e.g. parameter files)"
   echo ""
   exit 2
 }
 
-OPTS=`getopt -o "h" -l "help,output-dir:,submit-dir:,no-submit,skip-existing-output,skip-existing-jobs,disk-requirements:,memory-requirements:,save-failed-datafiles,site-requirements:,quick-test,extra-inputs:" -- "$@"`
+OPTS=`getopt -o "h" -l "help,output-dir:,submit-dir:,no-submit,skip-existing-output,skip-existing-jobs,disk-requirements:,memory-requirements:,save-failed-datafiles,site-requirements:,quick-test,no-monitor,extra-inputs:" -- "$@"`
 if [ $? -ne 0 ]; then PrintUsage; fi
 
 eval set -- "$OPTS"
@@ -131,6 +132,7 @@ SKIP_EXISTING_JOBS=
 SAVE_FAILED_DATAFILES=
 CFG_EXTENSION=
 QUICK_TEST=
+MONITOR=farmoutJobMonitor
 EXTRA_INPUTS=
 
 while [ ! -z "$1" ]
@@ -148,6 +150,7 @@ do
     --save-failed-datafiles) SAVE_FAILED_DATAFILES=1;;
     --site-requirements) shift; SITE_REQUIREMENTS="$1";;
     --quick-test) QUICK_TEST=1;;
+    --no-monitor) MONITOR="";;
     --extra-inputs) shift; EXTRA_INPUTS="$1";;
     --) shift; break;;
     *) die "Unexpected option $1";;
@@ -411,3 +414,11 @@ else
 fi
 
 echo "Jobs for $nEventsSubmitted events of $jobName are created in $SUBMIT_DIR"
+
+# Start the jobMonitor (runs for limited time in background)
+# Michael Anderson, July 5 2008
+if [ "$MONITOR" != "" ]; then
+  nohup ${MONITOR} > /dev/null &
+  echo "Monitor your jobs at"
+  echo "http://www.hep.wisc.edu/~$USER/jobMonitor.php"
+fi
