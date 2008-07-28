@@ -52,7 +52,7 @@ print GPFILE <<EOM;
 set terminal png transparent nocrop enhanced size 620,280
 set output '$webDir/$imgFile'
 set grid
-set title "Jobs (updated $hour:$min $mon $day, $year)"
+set title "$user\'s Jobs ($mon $day, $year)"
 set xlabel "Time (Hours)"
 set ylabel "Number of Jobs"
 set key reverse Left outside
@@ -92,7 +92,6 @@ print WEBPAGE <<EOM;
 <BODY>
 <CENTER><IMG SRC=$imgFile></CENTER>
 <hr>
-<h2>Info on jobs submitted by farmoutAnalysisJobs:</h2>
 <pre>
 EOM
 close WEBPAGE;
