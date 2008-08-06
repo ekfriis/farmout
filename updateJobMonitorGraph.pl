@@ -58,7 +58,7 @@ set ylabel "Number of Jobs"
 set key reverse Left outside
 set key autotitle columnheader
 set xdata time
-set timefmt "%H:%M"
+set timefmt "%m-%d-%H:%M"
 set format x "%H:%M"
 set style fill solid 1.00 noborder
 # Main plot command
