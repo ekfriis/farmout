@@ -18,7 +18,7 @@ logFile="/afs/hep.wisc.edu/home/$USER/jobMonitor.log"
 # max length of time to run this monitor (in minutes)
 # BUT KNOW: the monitor will stop when jobs on queue = 0
 #           OR when time running > maxTimeToMonitor
-maxTimeToMonitor=2520
+maxTimeToMonitor=7200
 ##################################################
 
 
