@@ -199,10 +199,11 @@ listSubAndOut() {
 
    #jobDir=`basename $jobDir`
    # Count just directories, this is the number of jobs submitted
-   #echo -e `ls -d $farmoutDir/$jobDir/*/        | wc | awk '{print $1}'`"\t\t\c"
-   printf "%9s" "`ls -d $farmoutDir/$jobDir/*/        | wc | awk '{print $1}'`"
+   #printf "%9s" "`ls -d $farmoutDir/$jobDir/*/        | wc | awk '{print $1}'`"
+   printf "%9s" "`find $farmoutDir/$jobDir/*/ -type d | wc -l `"
    if [[ -d "$dCacheDir/$jobDir" ]]; then
-     echo -e "   "`ls  $dCacheDir/$jobDir/*.root | wc | awk '{print $1}'`"\c" 
+    #echo -e "   "`ls  $dCacheDir/$jobDir/*.root | wc | awk '{print $1}'`"\c" 
+     echo -e "   "`find $dCacheDir/$jobDir/ -name \*.root | wc -l `"\c"
    fi
    echo -e "\t\t"$jobDir"\t"
 
