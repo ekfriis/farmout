@@ -1,7 +1,7 @@
 #!/bin/sh
 #
 
-jobcfg=$1
+jobcfgs=$1
 datafile=$2
 SRM_OUTPUT_DIR=$3
 SRM_OUTPUT_FILE="$SRM_OUTPUT_DIR/$datafile"
@@ -107,16 +107,34 @@ if [ "${FARMOUT_DASHBOARD_REPORTER}" != "" ]; then
     ${FARMOUT_DASHBOARD_REPORTER} execution
 fi
 
+# create directory for intermediate output
+mkdir intermediate
+
+echo "Running on host `hostname`"
+echo "Current working directory: `pwd`"
+echo "df `pwd`"
+df .
+
 start_time=`date "+%s"`
 
-cmsRun $jobcfg
-cmsRun_rc=$?
+for cfg in ${jobcfgs//,/ }; do
+  echo "farmout: starting cmsRun $cfg at `date`"
+
+  cmsRun $cfg
+  cmsRun_rc=$?
+
+  echo "farmout: cmsRun $cfg exited with status $cmsRun_rc at `date`"
+
+  echo "ls -ltr . intermediate"
+  ls -ltr . intermediate
+  echo "End of ls output"
+
+  if [ "$cmsRun_rc" != 0 ]; then
+    break
+  fi
+done
 
 export dboard_ExeTime=$((`date "+%s"` -  $start_time))
-
-echo "ls -ltr"
-ls -ltr
-echo "End of ls output"
 
 if [ "$cmsRun_rc" != "0" ]; then
   echo "cmsRun exited with status $cmsRun_rc"
@@ -133,6 +151,7 @@ if [ "$cmsRun_rc" != "0" ]; then
   # errors (e.g. dCache down) and retry in those cases.
   exit $FAIL_JOB
 fi
+
 
 if ! [ -f $datafile ]; then
   echo "cmsRun did not produce expected datafile $datafile"
