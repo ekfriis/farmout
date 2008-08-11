@@ -265,6 +265,7 @@ fi
 OUTPUT_DIR=${OUTPUT_DIR:-${SRM_HOME}/$jobName}
 SUBMIT_DIR=${SUBMIT_DIR:-${SUBMIT_HOME}/$jobName}
 submitFile=$SUBMIT_DIR/submit
+farmoutLogFile=$SUBMIT_DIR/farmoutRandomSeedJobs.log
 
 if [ -d "$SUBMIT_DIR" ] && [ "$SKIP_EXISTING_JOBS" != "1" ]; then
   logerror
@@ -465,7 +466,8 @@ if [ -z "$NO_SUBMIT" ]; then
     # location on the execution node.
     unset X509_USER_PROXY
 
-    condor_submit $submitFile
+    condor_submit $submitFile >> $farmoutLogFile
+    cat $farmoutLogFile
 else
     echo "Submit file $submitFile has been created but not submitted."
 fi
