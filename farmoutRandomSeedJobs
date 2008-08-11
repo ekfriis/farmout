@@ -20,7 +20,7 @@
 
 # for storing output
 SRM_SERVER=srm://cmssrm.hep.wisc.edu:8443
-PNFS_HOME=/pnfs/hep.wisc.edu/data5/uscms01/$USER
+PNFS_HOME=/pnfs/hep.wisc.edu/store/user/$USER
 
 SRM_HOME=${SRM_SERVER}/${PNFS_HOME}
 
@@ -422,7 +422,7 @@ while (( $nEvents > $nEventsSubmitted )); do
       fi
       jobinputfiles="$jobinputfiles,$step_cfg"
 
-      step_inputFileNames="\"${last_outputFileName}\""
+      step_inputFileNames="\"file:${last_outputFileName}\""
       sed < $template \
           "s|\\\$inputFileNames|$step_inputFileNames|g;
            s|\\\$outputFileName|$step_outputFileName|g" > $jobtag/$step_cfg
