@@ -14,7 +14,7 @@
 
 ##################################################
 farmoutDir="/scratch/$USER"
-dCacheDir="/pnfs/hep.wisc.edu/data5/uscms01/$USER"
+dCacheDir="/pnfs/hep.wisc.edu/store/user/$USER"
 ##################################################
 
 
@@ -43,6 +43,11 @@ basename() {
 
 
 ##################################################
+# Gives summary information about a workflow
+# Example:
+#   $ farmoutSummary aTestThing-photonjetanalyzer
+#   6.7M  /scratch/mbanderson/aTestThing-photonjetanalyzer/
+#     5 jobs with 5 normal terminations, 0 abnormal terminations, and 0 not done.
 checkThisJob() {
 
  dirCount=0
@@ -135,6 +140,7 @@ listAllJobs() {
   echo -e "\t No available jobs."
  fi
 }
+##################################################
 
 
 ##################################################
@@ -175,7 +181,14 @@ listDCacheFolders() {
 ##################################################
 # Looks for submit files on this machine
 # and finds if there is corresponding jobs 
-# in the dCache folder
+# in the dCache folder.
+#
+# Example output:
+#  Submitted   Completed
+#       Jobs   ROOT Files  Job Name
+#        134   134         JetET80-photonjetanalyzer
+#         25   13          PhotonJet20-200-photonjetanalyzer
+#         11   11          RelValSingleElectronPt35-photonjetanalyzer
 listSubAndOut() {
 
  echo -e "Submit folder: $HOSTNAME:$farmoutDir   \c" 
@@ -197,15 +210,20 @@ listSubAndOut() {
 
    dirCount=`expr $dirCount + 1`
 
-   #jobDir=`basename $jobDir`
-   # Count just directories, this is the number of jobs submitted
+   # Print number of submitted jobs
    #printf "%9s" "`ls -d $farmoutDir/$jobDir/*/        | wc | awk '{print $1}'`"
    printf "%9s" "`find $farmoutDir/$jobDir/*/ -type d | wc -l `"
+   #printf "%9s" "`tail -8 $farmoutDir/$jobDir/submit | grep InitialDir | awk '{print $3}' | awk -F'-' '{print $2+1}'`"
+
+   # Print  number of completed ROOT files
    if [[ -d "$dCacheDir/$jobDir" ]]; then
     #echo -e "   "`ls  $dCacheDir/$jobDir/*.root | wc | awk '{print $1}'`"\c" 
-     echo -e "   "`find $dCacheDir/$jobDir/ -name \*.root | wc -l `"\c"
+    #echo -e "   "`find $dCacheDir/$jobDir/ -name \*.root | wc -l `"\c"
+    printf "   %-12s" `find $dCacheDir/$jobDir/ -name \*.root | wc -l `
    fi
-   echo -e "\t\t"$jobDir"\t"
+
+   # Print the name of the job
+   echo -e "$jobDir\t"
 
   fi
  done
