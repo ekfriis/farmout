@@ -324,6 +324,7 @@ fi
 
 runDir=$SUBMIT_DIR
 submitFile=$runDir/submit
+farmoutLogFile=$runDir/farmoutAnalysisJobs.log
 
 # Make sure submitFile name is unique in case we are continuing a previous
 # submission.
@@ -564,7 +565,17 @@ elif [ -z "$NO_SUBMIT" ]; then
   # location on the execution node.
   unset X509_USER_PROXY
 
-  condor_submit $submitFile || die "Failed to submit $submitFile"
+  # Convoluted way of sending a message to the screen
+  # and to a log file about the sucess of submitting
+  # jobs and then "die"ing if needed.
+  condor_submit $submitFile >> $farmoutLogFile
+  if [ $? -eq 1 ]; then
+    echo "Failed to submit $submitFile" >> $farmoutLogFile
+    die 
+  else 
+    cat $farmoutLogFile
+    echo "Date: "`date` >> $farmoutLogFile
+  fi
 else
   echo "Submit file $submitFile has been created but not submitted."
 fi
