@@ -85,12 +85,14 @@ unlink ($gpfile, $datafile);
 open (WEBPAGE, "> $webDir/$webPage");
 print WEBPAGE <<EOM;
 <HTML>
+<META HTTP-EQUIV="REFRESH" CONTENT="120">
 <HEAD>
  <title>Job Monitoring</title>
  <LINK REL="SHORTCUT ICON" HREF="http://www.hep.wisc.edu/cms/comp/cmsIcon.ico">
 </HEAD>
 <BODY>
-<CENTER><IMG SRC=$imgFile></CENTER>
+<CENTER><IMG SRC=$imgFile><br>
+Updated $mon $day, $hour:$min</CENTER>
 <hr>
 <pre>
 EOM
