@@ -120,7 +120,8 @@ start_time=`date "+%s"`
 for cfg in ${jobcfgs//,/ }; do
   echo "farmout: starting cmsRun $cfg at `date`"
 
-  cmsRun $cfg
+  jobreport="${cfg%.*}.xml"
+  cmsRun --jobreport=$jobreport $cfg
   cmsRun_rc=$?
 
   echo "farmout: cmsRun $cfg exited with status $cmsRun_rc at `date`"
