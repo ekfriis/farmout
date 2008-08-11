@@ -62,7 +62,7 @@ report_task_meta() {
     dboard_jobId="TaskMeta"
 
     required_args="taskId jobId application exe tool GridName scheduler taskType vo user"
-    optional_args="dataset owner JSToolVersion tool_ui"
+    optional_args="datasetFull owner JSToolVersion tool_ui"
     check_required_dashboard_args ${required_args}
     build_dashboard_args ${required_args} ${optional_args}
     report_to_dashboard "$dboard_args"
@@ -74,7 +74,7 @@ report_submission() {
     report_task_meta
 
     required_args="taskId jobId sid application exe tool GridName scheduler taskType vo user"
-    optional_args="dataset owner JSToolVersion tool_ui"
+    optional_args="datasetFull owner JSToolVersion tool_ui"
     check_required_dashboard_args ${required_args}
     build_dashboard_args ${required_args} ${optional_args}
     report_to_dashboard "$dboard_args"

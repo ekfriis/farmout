@@ -20,12 +20,12 @@
 
 # for storing output
 SRM_SERVER=srm://cmssrm.hep.wisc.edu:8443
-PNFS_HOME=/pnfs/hep.wisc.edu/data5/uscms01/$USER
+PNFS_HOME=/pnfs/hep.wisc.edu/store/user/$USER
 
 # for getting input
 DCAP_SERVER=dcap://cmsdcap.hep.wisc.edu:22125
 # path to directory containing lfns: /store/...
-PNFS_STORE=/pnfs/hep.wisc.edu/data4/PA_TFC
+PNFS_STORE=/pnfs/hep.wisc.edu
 
 SRM_HOME=${SRM_SERVER}/${PNFS_HOME}
 DCAP_HOME=${DCAP_SERVER}${PNFS_HOME}
@@ -359,10 +359,14 @@ fi
 if [ "$CMS_DASHBOARD_REPORTER" = "" ]; then
    echo "No CMS_DASHBOARD_REPORTER defined, so no reporting to the CMS dashboard."
 fi
+if [ "$INPUT_DBS_PATH" != "" ]; then
+    dboard_datasetFull="dboard_datasetFull=${INPUT_DBS_PATH}"
+fi
 dboard="
 dboard_taskId=${USER}-`hostname -f`-\$(Cluster)
 dboard_jobId=\$(Process)
 dboard_sid=\$\$([GlobalJobId])
+${dboard_datasetFull}
 dboard_application=`basename ${CMSSW_HOME}`
 dboard_exe=cmsRun
 dboard_tool=farmout
