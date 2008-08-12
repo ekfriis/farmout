@@ -220,6 +220,8 @@ listSubAndOut() {
     #echo -e "   "`ls  $dCacheDir/$jobDir/*.root | wc | awk '{print $1}'`"\c" 
     #echo -e "   "`find $dCacheDir/$jobDir/ -name \*.root | wc -l `"\c"
     printf "   %-12s" `find $dCacheDir/$jobDir/ -name \*.root | wc -l `
+   else
+    printf "   %-12s" " "
    fi
 
    # Print the name of the job
