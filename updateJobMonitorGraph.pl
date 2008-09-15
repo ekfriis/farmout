@@ -19,10 +19,11 @@ $webDir = "$homeDir/www";
 $webPage = "jobMonitor.php";
 $imgFile = "jobMonitor.png";
 
-# Temp files and executable locations
+# GNUPLOT Setup
+system ("source /afs/hep/cms/sw/gnuplot/setup.sh");
+$GNUPLOT = "gnuplot";
+# Locations for temporary files (wherever you want)
 $gpfile = "/tmp/gnuplot_$$.gp";
-#$GNUPLOT = "gnuplot";
-$GNUPLOT = "/afs/hep.wisc.edu/cms/sw/gnuplot/bin/gnuplot";
 $farmoutSumLog = "/tmp/$user-farmoutSummary.log";
 ##################################################
 
@@ -66,6 +67,8 @@ set style fill solid 1.00 noborder
 plot "$logfile" using 1:(\$3+\$4+\$5) title 3 with boxes, '' using 1:(\$4+\$5) title 4 with boxes, '' using 1:5 title 5 with boxes
 EOM
 close GPFILE;
+##################################################
+
 
 ##################################################
 # SECTION 4:
