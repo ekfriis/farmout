@@ -20,7 +20,6 @@ $webPage = "jobMonitor.php";
 $imgFile = "jobMonitor.png";
 
 # GNUPLOT Setup
-system ("source /afs/hep/cms/sw/gnuplot/setup.sh");
 $GNUPLOT = "gnuplot";
 # Locations for temporary files (wherever you want)
 $gpfile = "/tmp/gnuplot_$$.gp";
