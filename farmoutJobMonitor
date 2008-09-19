@@ -19,6 +19,11 @@ logFile="/afs/hep.wisc.edu/home/$USER/jobMonitor.log"
 # BUT KNOW: the monitor will stop when jobs on queue = 0
 #           OR when time running > maxTimeToMonitor
 maxTimeToMonitor=7200
+
+# This following is a script that loads the
+# correct version of gnuplot into the user's
+# path (either 32 or 64-bit). Needed by updateJobMonitorGraph.pl
+source /afs/hep/cms/sw/gnuplot/setup.sh
 ##################################################
 
 
