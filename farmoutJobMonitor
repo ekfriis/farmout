@@ -77,6 +77,7 @@ for ((i=0;i<=$maxTimeToMonitor;i+=1)); do
 
     # If there are no jobs left, quit
     if [ "$totalJobs" -eq 0 ]; then
+      echo '# totalJobs='$totalJobs', quitting.' >> $logFile
       exit
     fi
 
