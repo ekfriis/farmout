@@ -95,6 +95,7 @@ print WEBPAGE <<EOM;
 <BODY>
 <CENTER><IMG SRC=$imgFile><br>
 Updated $mon $day, $hour:$min</CENTER>
+<a href="http://www.hep.wisc.edu/cms/comp/cmsprod/dCacheUserUsage.html">$user\'s disk use plot</a>
 <hr>
 <pre>
 EOM
