@@ -15,7 +15,7 @@ $homeDir = "/afs/hep.wisc.edu/home/$user";
 $logfile = "$homeDir/jobMonitor.log";
 
 # The webpage and gif file will be placed in webDir
-$webDir = "$homeDir/www";
+$webDir = "$homeDir/public_html";
 $webPage = "jobMonitor.php";
 $imgFile = "jobMonitor.png";
 
