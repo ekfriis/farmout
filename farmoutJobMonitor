@@ -45,8 +45,28 @@ fi
 
 
 ##################################################
-# Make the user's web dir if it doesn't exist
-mkdir -p /afs/hep.wisc.edu/home/$USER/www
+# Set up user's www and public_html dir's as needed
+publicDir="/afs/hep.wisc.edu/home/$USER/public_html"
+wwwDir="/afs/hep.wisc.edu/home/$USER/www"
+
+# Make the user's public_html dir if it doesn't exist
+mkdir -p $publicDir
+
+# Do they have a www directory?
+if [[ -d "$wwwDir" ]]; then
+  # Yes they do.  Is it a soft link to their public_html?
+  if [[ ! -h "$wwwDir" ]]; then
+    # No it's not.  Move everything from www to 
+    #  public_html, remove it, and create soft link.
+    #mv $wwwDir/* $publicDir/
+    #rmdir $wwwDir
+    mv $wwwDir $wwwDir-OLD
+    ln -s $publicDir $wwwDir
+  fi
+else
+  # No they don't.  Create www soft link to public_html
+  ln -s $publicDir $wwwDir
+fi
 
 # Create new log file
 echo "#PID $$" > $logFile
