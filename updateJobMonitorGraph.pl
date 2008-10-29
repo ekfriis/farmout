@@ -79,6 +79,21 @@ unlink ($gpfile, $datafile);
 
 
 ##################################################
+# Optional Section
+#  Check user's disk usage and give notice
+#  if they're using a lot.
+$diskUseString="";
+$diskUseFile='/cms/www/comp/cmsprod/dCacheUserUsage.txt';
+if (-r $diskUseFile) {
+  $diskUseRank=`grep $user $diskUseFile | awk '{print \$3}'`;
+  if ($diskUseRank > 5000) {
+    $diskUseString="<a href=\"http://www.hep.wisc.edu/cms/comp/cmsprod/dCacheUserUsage.html\">$user\'s disk use</a> is greater than 5000 GB. Please consider <br>removing unused files. (Disk use is auto-checked only once a day).";
+  }
+}
+##################################################
+
+
+##################################################
 # SECTION 5:
 # Output an HTML page to display the graphic we
 # just generated.
@@ -95,7 +110,7 @@ print WEBPAGE <<EOM;
 <BODY>
 <CENTER><IMG SRC=$imgFile><br>
 Updated $mon $day, $hour:$min</CENTER>
-<a href="http://www.hep.wisc.edu/cms/comp/cmsprod/dCacheUserUsage.html">$user\'s disk use plot</a>
+$diskUseString
 <hr>
 <pre>
 EOM
