@@ -1,0 +1,265 @@
+#!/bin/sh
+
+# CRAB environment setup
+
+export PYTHONPATH=
+export PATH=/cms/sw/python-2.5/bin:$PATH
+source /cms/sw/CRAB_2_3_1/crab.sh
+
+# Initialize default settings:
+
+DBS_URL=
+
+# for storing output
+SRM_SERVER=srm://cmssrm.hep.wisc.edu:8443
+SEName=cmssrm.hep.wisc.edu
+PNFS_HOME=/pnfs/hep.wisc.edu/store/user/$USER
+
+# for getting input
+DCAP_SERVER=dcap://cmsdcap.hep.wisc.edu:22125
+# path to directory containing lfns: /store/...
+PNFS_STORE=/pnfs/hep.wisc.edu
+
+SRM_HOME=${SRM_SERVER}/${PNFS_HOME}
+DCAP_HOME=${DCAP_SERVER}${PNFS_HOME}
+
+MIN_PROXY_HOURS=24
+
+scratch_dir="/data"
+if ! [ -d $scratch_dir ]; then
+  scratch_dir="/scratch"
+fi
+if ! [ -d $scratch_dir ]; then
+  scratch_dir="/tmp"
+fi
+SUBMIT_HOME=${scratch_dir}/$USER
+
+
+basename() {
+  # This shell function is faster than calling /bin/basename
+  path=$1
+  suffix=$2
+  path=${path##*/}  # get everything after the final '/'
+  if [ ! -z $suffix ]; then
+    path=${path%$suffix}
+  fi
+  echo $path
+}
+
+realpath() {
+  if ! [ -a "$1" ]; then
+    echo "$1"
+  fi
+  readlink -f $1
+}
+
+logerror() {
+  echo 2>&1 "$@"
+}
+
+die() {
+  logerror
+  logerror "$@"
+  exit 1
+}
+
+check_proxy() {
+  hours=$1
+  proxy=$2
+  if ! [ -f "$proxy" ]; then
+    logerror
+    logerror "NOTE: No grid proxy found.  (Expecting to find it here: $proxy.)"
+    return 1
+  fi
+
+  #Issue a warning if less than this many seconds remain:
+  min_proxy_lifetime=$((3600*$hours))
+
+  seconds_left="`voms-proxy-info --timeleft --file=$proxy 2>/dev/null`"
+
+  if [ "$seconds_left" = "" ]; then
+    echo "WARNING: cannot find time remaining for grid proxy."
+    voms-proxy-info -all -path $proxy
+    return 0
+  fi
+  if [ "$seconds_left" -lt "$min_proxy_lifetime" ]; then
+    logerror
+    logerror "NOTE: grid proxy is about to expire:"
+    logerror "voms-proxy-info"
+    voms-proxy-info --file=$proxy
+    return 1
+  fi
+
+}
+
+PrintUsage() {
+  echo "USAGE: publishFarmoutput [options] <jobName> <CMSSW Ver> <config file>"
+  echo ""
+  echo "OPTIONS:"
+  echo "  --dbs-url=http://..."
+  echo "  --output-dir=${DCAP_HOME}/<jobName>-<runName>"
+  echo "  --submit-dir=${SUBMIT_HOME}/<jobName>-<runName>"
+  echo "  --PrimaryDataset=<jobName>"
+  echo "  --ProcessedDataset=<runName>"
+  echo "  --DataTier=tier (e.g. GEN-SIM-DIGI)"
+  echo "  --ApplicationFamily=name (e.g. output)"
+  echo "  --SEName=${SEName}"
+  echo ""
+  echo "Note that <runName> is taken from the name of the config file."
+  exit 2
+}
+
+OPTS=`getopt -o "h" -l "help,dbs-url:,output-dir:,submit-dir:,PrimaryDataset:,ProcessedDataset:,DataTier:,ApplicationFamily:,SEName:,continue" -- "$@"`
+if [ $? -ne 0 ]; then PrintUsage; fi
+
+eval set -- "$OPTS"
+
+OUTPUT_DIR=
+SUBMIT_DIR=
+CFG_EXTENSION=
+PrimaryDataset=
+ProcessedDataset=
+DataTier=
+ApplicationFamily=
+ApplicationName=cmsRun
+CONTINUE_PUB=0
+
+
+while [ ! -z "$1" ]
+do
+  case "$1" in
+    -h) PrintUsage;;
+    --help) PrintUsage;;
+    --dbs-url) shift; DBS_URL=$1;;
+    --output-dir) shift; OUTPUT_DIR=$1;;
+    --submit-dir) shift; SUBMIT_DIR=$1;;
+    --PrimaryDataset) shift; PrimaryDataset=$1;;
+    --ProcessedDataset) shift; ProcessedDataset=$1;;
+    --DataTier) shift; DataTier=$1;;
+    --ApplicationFamily) shift; ApplicationFamily=$1;;
+    --SEName) shift; SEName=$1;;
+    --continue) CONTINUE_PUB=1;;
+    --) shift; break;;
+    *) die "Unexpected option $1";;
+  esac
+  shift
+done
+
+if [ "$#" -ne 3 ]; then PrintUsage; fi
+
+
+# Check for some required utilities
+for exe in scramv1 readlink voms-proxy-info; do
+  if ! which $exe >& /dev/null; then
+    die "Cannot find $exe in PATH.  Your environment is not correctly set up."
+  fi
+done
+
+# Additional command-line arguments
+
+jobName=$1
+ApplicationVersion=`basename $2`
+configTemplate=`realpath $3`
+
+CFG_EXTENSION="${configTemplate/*./}"
+runName=`basename $configTemplate .${CFG_EXTENSION}`
+
+OUTPUT_DIR=${OUTPUT_DIR:-${DCAP_HOME}/$jobName-$runName}
+SUBMIT_DIR=${SUBMIT_DIR:-${SUBMIT_HOME}/$jobName-$runName}
+LFN_DIR=/store/${OUTPUT_DIR#*/store/}
+
+FARMOUT_HOME=`realpath $0`
+if ! [ -f "${FARMOUT_HOME}" ]; then
+  FARMOUT_HOME=`basename $0`
+  FARMOUT_HOME=`which ${FARMOUT_HOME}`
+fi
+FARMOUT_HOME=`dirname ${FARMOUT_HOME}`
+
+PrimaryDataset=${PrimaryDataset:-${jobName}}
+ProcessedDataset=${ProcessedDataset:-${runName}}
+
+for name in DataTier PrimaryDataset ProcessedDataset ApplicationFamily SEName; do
+  if [ "${!name}" = "" ]; then
+    die "You must specify --${name}."
+  fi
+done
+
+proxy=${X509_USER_PROXY:-/tmp/x509up_u$UID}
+
+if ! check_proxy $MIN_PROXY_HOURS $proxy; then
+  logerror
+  logerror "You must create a new grid proxy"
+  logerror "and rerun this command.  Example of how to create a grid proxy:"
+  logerror
+  logerror "voms-proxy-init --voms=cms --hours=48"
+  exit 1
+fi
+
+# CRAB uses edmConfigChecksum to generate the PSetHash.
+# Unfortunately, our template is not parsable, so that does not work.
+# Therefore, we just run md5sum.  However, this does not produce the
+# same hash value as edmConfigTemplate.
+# Perhaps it would be better to generate the hash based on the first
+# job.  (NOTE: registering a different hash for each job is not what
+# DBS is expecting; this results in errors at publication time.)
+for field in `md5sum ${configTemplate}`; do
+  PSetHash=${field}
+  break # checksum is first field, so we are done
+done
+
+PUB_DIR=${SUBMIT_DIR}-pub
+
+if [ "${CONTINUE_PUB}" != "1" ] && [ -d ${PUB_DIR} ]; then
+  logerror
+  logerror "The directory ${PUB_DIR} already exists."
+  logerror "Either rerun this script with the --continue option or"
+  logerror "remove it and rerun this script.."
+  exit 1
+fi
+
+mkdir -p ${PUB_DIR}/res
+
+find ${SUBMIT_DIR} -name \*.xml |
+while read input_fjr; do
+
+  # The publication script is stolen from CRAB.
+  # It expects framework job reports of form res/crab_fjr*.
+  output_fjr=${PUB_DIR}/res/crab_fjr_`basename ${input_fjr}`
+  if [ -f ${output_fjr} ]; then
+    echo "${output_fjr} already exists; skipping"
+    continue
+  fi
+
+  python ${FARMOUT_HOME}/ModifyJobReport.py \
+    --input-fjr=${input_fjr} \
+    --output-fjr=${output_fjr} \
+    --PrimaryDataset=${PrimaryDataset} \
+    --ProcessedDataset=${ProcessedDataset} \
+    --DataTier=${DataTier} \
+    --ApplicationFamily=${ApplicationFamily} \
+    --ApplicationName=${ApplicationName} \
+    --ApplicationVersion=${ApplicationVersion} \
+    --PSetHash=${PSetHash} \
+    --SEName=${SEName} \
+    --pfn-path=${OUTPUT_DIR} \
+    --lfn-path=${LFN_DIR} \
+  || die "Failed to prepare framework job report for publication: ${input_fjr}"
+
+done || exit 1
+
+
+cd ${PUB_DIR} || die
+
+if [ "$DBS_URL" = "" ]; then
+  logerror
+  logerror "ERROR: no --dbs-url specified; aborting before publication step"
+  exit 1
+fi
+
+# crab expects a log directory
+mkdir -p log
+
+python ${FARMOUT_HOME}/CallCrabPublisher.py \
+  --dbs-url=${DBS_URL} \
+  --ProcessedDataset=${ProcessedDataset} \
+  --pset=${configTemplate}
