@@ -8,7 +8,7 @@ source /cms/sw/CRAB_2_3_1/crab.sh
 
 # Initialize default settings:
 
-DBS_URL=
+DBS_URL=https://cmsdbsprod.cern.ch:8443/cms_dbs_prod_local_01_writer/servlet/DBSServlet
 
 # for storing output
 SRM_SERVER=srm://cmssrm.hep.wisc.edu:8443
@@ -96,16 +96,17 @@ PrintUsage() {
   echo "USAGE: publishFarmoutput [options] <jobName> <CMSSW Ver> <config file>"
   echo ""
   echo "OPTIONS:"
-  echo "  --dbs-url=http://..."
-  echo "  --output-dir=${DCAP_HOME}/<jobName>-<runName>"
-  echo "  --submit-dir=${SUBMIT_HOME}/<jobName>-<runName>"
+  echo "  --dbs-url=${DBS_URL} (default is OSG local DBS)"
+  echo "  --output-dir=${DCAP_HOME}/<jobName>"
+  echo "  --submit-dir=${SUBMIT_HOME}/<jobName>"
   echo "  --PrimaryDataset=<jobName>"
-  echo "  --ProcessedDataset=<runName>"
-  echo "  --DataTier=tier (e.g. GEN-SIM-DIGI)"
-  echo "  --ApplicationFamily=name (e.g. output)"
+  echo "  --ProcessedDataset=name"
+  echo "  --DataTier=tier (default USER)"
+  echo "  --ApplicationFamily=name (default 'output')"
   echo "  --SEName=${SEName}"
   echo ""
-  echo "Note that <runName> is taken from the name of the config file."
+  echo "The published dataset will be <PrimaryDataset>/<ProcessedDataset>/<DataTier>"
+  echo "Example: /PhotonJet_Pt_30_50/CMSSW_2_1_7-more-info/USER"
   exit 2
 }
 
@@ -119,8 +120,10 @@ SUBMIT_DIR=
 CFG_EXTENSION=
 PrimaryDataset=
 ProcessedDataset=
-DataTier=
-ApplicationFamily=
+DataTier=USER
+# Not sure what ApplicationFamily means.  Using default value same as
+# ModuleLabel that appears in fjr for farmout jobs.
+ApplicationFamily=output
 ApplicationName=cmsRun
 CONTINUE_PUB=0
 
@@ -164,8 +167,8 @@ configTemplate=`realpath $3`
 CFG_EXTENSION="${configTemplate/*./}"
 runName=`basename $configTemplate .${CFG_EXTENSION}`
 
-OUTPUT_DIR=${OUTPUT_DIR:-${DCAP_HOME}/$jobName-$runName}
-SUBMIT_DIR=${SUBMIT_DIR:-${SUBMIT_HOME}/$jobName-$runName}
+OUTPUT_DIR=${OUTPUT_DIR:-${DCAP_HOME}/$jobName}
+SUBMIT_DIR=${SUBMIT_DIR:-${SUBMIT_HOME}/$jobName}
 LFN_DIR=/store/${OUTPUT_DIR#*/store/}
 
 FARMOUT_HOME=`realpath $0`
@@ -176,7 +179,7 @@ fi
 FARMOUT_HOME=`dirname ${FARMOUT_HOME}`
 
 PrimaryDataset=${PrimaryDataset:-${jobName}}
-ProcessedDataset=${ProcessedDataset:-${runName}}
+#ProcessedDataset=${ProcessedDataset:-${runName}}
 
 for name in DataTier PrimaryDataset ProcessedDataset ApplicationFamily SEName; do
   if [ "${!name}" = "" ]; then
