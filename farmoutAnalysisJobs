@@ -70,8 +70,10 @@ logerror() {
 }
 
 die() {
-  logerror
-  logerror "$@"
+  if [ $# -gt 0 ]; then
+    logerror
+    logerror "$@"
+  fi
   exit 1
 }
 
@@ -227,7 +229,7 @@ if [ "$EXTRA_INPUTS" != "" ]; then
   for file in ${EXTRA_INPUTS//,/ }; do
     if ! [ -a $file ]; then
       logerror "ERROR: Cannot find file specified in --extra-inputs: $file"
-      exit 1
+      die
     fi
   done
 fi
@@ -294,7 +296,7 @@ if [ -d "$SUBMIT_DIR" ] && [ "$SKIP_EXISTING_JOBS" != "1" ]; then
   logerror
   logerror "You must either remove it, or specify --skip-existing-jobs, or"
   logerror "specify a different job name or submission directory with --submit-dir"
-  exit 1
+  die
 fi
 
 proxy=${X509_USER_PROXY:-/tmp/x509up_u$UID}
@@ -305,7 +307,7 @@ if [ "$NO_SUBMIT" != 1 ] && ! check_proxy $MIN_PROXY_HOURS $proxy; then
   logerror "and rerun this command.  Example of how to create a grid proxy:"
   logerror
   logerror "voms-proxy-init --voms=cms --hours=48"
-  exit 1
+  die
 fi
 
 
@@ -546,7 +548,7 @@ error                = $stderr
 Log                  = $conlog
 Queue
 EOF
-done || exit 1
+done || die
 
 echo ""
 
