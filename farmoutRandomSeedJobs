@@ -227,7 +227,7 @@ fi
 
 for macro in \$randomNumber \$nEventsPerJob \$outputFileName; do
   if ! grep -F -q $macro $configTemplate; then
-    die "$macro must appear on the configuration template.  I can't find it in $configTemplate"
+    die "$macro must appear on the configuration template.  I can't find it in $configTemplate, so I am going to abort.  If you know what you are doing and this macro really isn't needed, simply put this macro in a comment in your template so that I see it and conclude that all is well."
   fi
 done
 
@@ -390,7 +390,10 @@ while (( $nEvents > $nEventsSubmitted )); do
     # in order to assure proper treatment of macros that share a common
     # prefix (e.g. randomNumber11 should be replaced before randomNumber1)
     for randomMacro in $randomMacros; do
-        randomNumber=${RANDOM}
+        # ${RANDOM} is 15-bit
+	# prepend the job number to it to make sure no two jobs in
+	# a batch have the same seed
+        randomNumber=$(( ${RANDOM} + (${job}<<15) ))
         randomSed="${randomSed}s/\\${randomMacro}/${randomNumber}/g;"
     done
 
