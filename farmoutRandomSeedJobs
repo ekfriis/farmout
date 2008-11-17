@@ -41,32 +41,6 @@ if ! [ -d $scratch_dir ]; then
 fi
 SUBMIT_HOME=${scratch_dir}/$USER
 
-
-# We fork hexdump from a sub-process to avoid annoying
-# job-control message from bash when we kill it off later.
-# Turning off job-control message is not as simple as you
-# might think.  In fact, it does not appear to be possible.
-fork_urandom() {
-  hexdump -e '"%4u\n"' /dev/urandom 5<>${URANDOM} >/dev/fd/5 &
-  echo $!
-}
-# Create a FIFO stream of random 32-bit unsigned integers.
-# To read from it, do read VARNAME < ${URANDOM}
-start_urandom() {
-  URANDOM=/tmp/farmout_urandom.$$
-  mkfifo ${URANDOM}
-  # save the PID so we can shut it down later
-  URANDOM_PID=$( fork_urandom )
-}
-stop_urandom() {
-  if [ "${URANDOM_PID}" != "" ]; then
-    kill ${URANDOM_PID}
-    rm ${URANDOM}
-    unset URANDOM_PID
-    unset URANDOM
-  fi
-}
-
 logerror() {
   echo 2>&1 "$@"
 }
@@ -76,7 +50,6 @@ die() {
     logerror
     logerror "$@"
   fi
-  stop_urandom
   exit 1
 }
 
@@ -218,6 +191,12 @@ done
 if ! [ -d "$CMSSW_HOME" ]; then
   die "No such directory: $CMSSW_HOME"
 fi
+
+# randomize
+if [ "$RANDOM" = "" ]; then
+  die "\$RANDOM is not working.  Are you using bash?"
+fi
+RANDOM=`date +%N | cut -c 1-6 | sed 's|^0*||'`
 
 proxy=${X509_USER_PROXY:-/tmp/x509up_u$UID}
 
@@ -377,8 +356,6 @@ for template in $chainedConfigs; do
   let final_step=$final_step+1
 done
 
-start_urandom || die "Failed to start up /dev/urandom stream."
-
 #
 # Loop over jobs
 #
@@ -417,7 +394,13 @@ while (( $nEvents > $nEventsSubmitted )); do
     # in order to assure proper treatment of macros that share a common
     # prefix (e.g. randomNumber11 should be replaced before randomNumber1)
     for randomMacro in $randomMacros; do
-        read randomNumber < ${URANDOM} || die "Failed to read from urandom."
+        # ${RANDOM} is 15-bit
+        # prepend the job number to it to make sure no two jobs in
+        # a batch have the same seed
+	# The modulo 900000000 is to avoid going over the limit
+	# for maximum seed value in HepJamesRandom.
+        randomNumber=$(( (${RANDOM} + (${job}<<15)) % 900000000 ))
+
         randomSed="${randomSed}s/\\${randomMacro}/${randomNumber}/g;"
     done
 
