@@ -467,7 +467,6 @@ EOF
 
 done
 
-stop_urandom
 
 #
 # Submit the jobs
