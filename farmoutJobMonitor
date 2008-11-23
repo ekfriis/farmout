@@ -20,6 +20,10 @@ logFile="/afs/hep.wisc.edu/home/$USER/jobMonitor.log"
 #           OR when time running > maxTimeToMonitor
 maxTimeToMonitor=7200
 
+# OPTIONAL: Copy image plot to this directory,
+#  leave blank for no copy.
+imageCopyDir="/cms/www/comp/farmout_users/userJobsPlots/"
+
 # This following is a script that loads the
 # correct version of gnuplot into the user's
 # path (either 32 or 64-bit). Needed by updateJobMonitorGraph.pl
@@ -87,6 +91,10 @@ for ((i=0;i<=$maxTimeToMonitor;i+=1)); do
   if [ $((i % 2)) -eq 1 ]; then
 
     /cms/cmsprod/bin/updateJobMonitorGraph.pl
+    # Copy the user's job plot
+    if [ -n "$imageCopyDir" ] ; then
+      cp ~$USER/www/jobMonitor.png $imageCopyDir/$USER.png
+    fi
 
     # If there are no jobs left, quit
     if [ "$totalJobs" -eq 0 ]; then
