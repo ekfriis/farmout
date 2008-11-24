@@ -32,17 +32,23 @@ source /afs/hep/cms/sw/gnuplot/setup.sh
 
 
 ##################################################
-# See if the log file already exists.
-# If true, this means jobMonitor already ran, 
-# which is ok, but we need to check if it is
-# still running so as not to run another instance.
+# See if the job monitor is running.
+# First see if the log file exists.
 if [ -f "$logFile" ]; then
- # Logfile exists, check to see if jobMonitor is already running
+ # Logfile exists, check to see if same process-id is running
  lastPID=`head -1 $logFile | awk '{print $2}'`
  checkRunning=`ps -p $lastPID | grep $lastPID`
  if [ "$checkRunning"  ]; then
-  #jobMonitor is already running, so don't run again
-  exit
+  # a process with the same PID is running, so
+  # check if log file has been modified recently?
+  logLastModified=`ls -l --time-style=+%s $logFile | awk '{print $6}'`
+  timeSinceLastMod=$((`date +%s`-$logLastModified))
+  if [[ timeSinceLastMod -lt 3600 ]]; then
+   # it's been modified recently, so it 
+   # could still be running, so quit.
+   echo "Warning: farmoutJobMonitor appears to be running already, new instance will not be started."
+   exit
+  fi
  fi
 fi
 ##################################################
