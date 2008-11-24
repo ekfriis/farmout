@@ -67,7 +67,7 @@ fi
 
 # Create new log file
 echo "#PID $$" > $logFile
-echo "#Log of jobs running on condor" >> $logFile
+echo "#Log of jobs running on condor from $HOSTNAME" >> $logFile
 echo "#Started: "`date` >> $logFile
 echo "MonthDayHourMin Total Idle Running Held" >> $logFile
 ##################################################
