@@ -38,12 +38,18 @@ if [ -f "$logFile" ]; then
   # check if log file has been modified recently?
   logLastModified=`ls -l --time-style=+%s $logFile | awk '{print $6}'`
   timeSinceLastMod=$((`date +%s`-$logLastModified))
-  if [[ "$timeSinceLastMod" -lt "360" ]]; then
+  if [[ "$timeSinceLastMod" -lt "300" ]]; then
     # it's been modified recently, so it 
     # could still be running, so quit.
-    echo "farmoutJobMonitor appears to be running already - maybe on another machine"
-    echo "log file = $logFile"
-    echo "Only one job monitor will run at a time."
+
+    # For less confusion Give a warning if it's running somewhere else
+    lastHostname=`grep "Hostname" $logFile | awk '{print $2}'`
+    if [[ "$lastHostname" != "$HOSTNAME" ]]; then
+      echo "farmoutJobMonitor appears to be running on another machine, $lastHostname"
+      echo "A new instance cannot be started on this machine, $HOSTNAME"
+      echo "See $logFile"
+    fi
+
     exit
   fi
 fi
@@ -69,7 +75,8 @@ fi
 
 # Create new log file
 echo "#PID $$" > $logFile
-echo "#Log of jobs running on condor from $HOSTNAME" >> $logFile
+echo "#Log of jobs running on condor from this machine," >> $logFile
+echo "#Hostname: $HOSTNAME" >> $logFile
 echo "#Started: "`date` >> $logFile
 echo "MonthDayHourMin Total Idle Running Held" >> $logFile
 ##################################################
