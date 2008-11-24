@@ -43,6 +43,7 @@ if [ -f "$logFile" ]; then
     # could still be running, so quit.
     echo "farmoutJobMonitor appears to be running already - maybe on another machine"
     echo "log file = $logFile"
+    echo "Only one job monitor will run at a time."
     exit
   fi
 fi
