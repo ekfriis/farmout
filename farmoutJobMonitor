@@ -38,7 +38,7 @@ if [ -f "$logFile" ]; then
   # check if log file has been modified recently?
   logLastModified=`ls -l --time-style=+%s $logFile | awk '{print $6}'`
   timeSinceLastMod=$((`date +%s`-$logLastModified))
-  if [[ "$timeSinceLastMod" -lt "300" ]]; then
+  if [[ "$timeSinceLastMod" -lt "600" ]]; then
     # it's been modified recently, so it 
     # could still be running, so quit.
 
