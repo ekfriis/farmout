@@ -43,6 +43,24 @@ basename() {
 
 
 ##################################################
+# Check number of folders in user's dCache area.
+# If there's too many folders, this will be too
+# slow. So quit.
+checkNumFolders() {
+  dirCount=`ls $dCacheDir | wc -l`
+
+  if [ "$dirCount" -gt 50 ]; then
+    echo "Too many folders (greater than 50) in"
+    echo "  $dCacheDir"
+    echo "to summarize in reasonable time."
+    exit
+  fi
+}
+
+##################################################
+
+
+##################################################
 # Gives summary information about a workflow
 # Example:
 #   $ farmoutSummary aTestThing-photonjetanalyzer
@@ -240,6 +258,7 @@ if [ $# -ne 1 ]; then
  #listAllJobs
  #listDCacheFolders
  listCondorJobs
+ checkNumFolders
  listSubAndOut
  printUsage
 
