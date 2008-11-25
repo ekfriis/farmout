@@ -102,7 +102,7 @@ for ((i=0;i<=$maxTimeToMonitor;i+=1)); do
     /cms/cmsprod/bin/updateJobMonitorGraph.pl
     # Copy the user's job plot
     if [ -n "$imageCopyDir" ] ; then
-      cp /afs/hep.wisc.edu/home/$USER/www/jobMonitor.png $imageCopyDir/$USER.png
+      cp /afs/hep.wisc.edu/home/$USER/public_html/jobMonitor.png $imageCopyDir/$USER.png
     fi
 
     # If there are no jobs left, quit
