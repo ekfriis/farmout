@@ -143,7 +143,7 @@ do
   case "$1" in
     -h) PrintUsage;;
     --help) PrintUsage;;
-    --no-submit) NO_SUBMIT=1;;
+    --no-submit) NO_SUBMIT=1;MONITOR="";;
     --output-dir) shift; OUTPUT_DIR=$1;;
     --submit-dir) shift; SUBMIT_DIR=$1;;
     --skip-existing-output) SKIP_EXISTING_OUTPUT=1;;
