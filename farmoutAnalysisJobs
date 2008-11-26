@@ -180,7 +180,7 @@ do
   case "$1" in
     -h) PrintUsage;;
     --help) PrintUsage;;
-    --no-submit) NO_SUBMIT=1;;
+    --no-submit) NO_SUBMIT=1; MONITOR="";;
     --job-count) shift; JOB_LIMIT=$1;;
     --skip-existing-output) SKIP_EXISTING_OUTPUT=1;;
     --skip-existing-jobs) SKIP_EXISTING_JOBS=1;;
