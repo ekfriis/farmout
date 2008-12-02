@@ -112,11 +112,12 @@ void WriteMergeObjects( TFile *target ) {
 
   target->Write();
 
+  // Temporarily let multiple root files remain if > 2GB
   // Prevent Target_1.root Target_2.root, ... from happening.
-  long long max_tree_size = 200000000000LL; // 200 GB
-  if(TTree::GetMaxTreeSize() < max_tree_size ) {
-    TTree::SetMaxTreeSize(max_tree_size);
-  }
+  //  long long max_tree_size = 200000000000LL; // 200 GB
+  //  if(TTree::GetMaxTreeSize() < max_tree_size ) {
+  //    TTree::SetMaxTreeSize(max_tree_size);
+  //  }
 
   nextobj = MergeChains.MakeIterator();
   TObjString *pathname_obj;
@@ -129,6 +130,11 @@ void WriteMergeObjects( TFile *target ) {
     ch->Merge(target,0,"KEEP");
 
     delete ch;
+
+	// in case of multiple objects with same pathname, must remove
+	// this one from the list so we don't get the same (deleted)
+	// one next time we look up the same name
+	MergeChains.Remove(pathname_obj);
   }
   MergeChains.Clear();
 
@@ -137,7 +143,7 @@ void WriteMergeObjects( TFile *target ) {
 
 void InitMergeObjects( TDirectory *target, TFile *source ) {
   TString path( (char*)strstr( target->GetPath(), ":" ) );
-  path.Remove( 0, 2 );
+  path.Remove( 0, 1 );
 
   source->cd( path );
   TDirectory *current_sourcedir = gDirectory;
@@ -178,7 +184,7 @@ void InitMergeObjects( TDirectory *target, TFile *source ) {
       // newdir is now the starting point of another round of merging
       // newdir still knows its depth within the target file via
       // GetPath(), so we can still figure out where we are in the recursion
-      IntitMergeObjects( newdir, source );
+      InitMergeObjects( newdir, source );
 
     } else {
 
@@ -224,7 +230,6 @@ void MergeRootfile( TDirectory *target, TString source_name ) {
       TH1 *h2 = (TH1*)gDirectory->Get( h1->GetName() );
       if ( h2 ) {
         h1->Add( h2 );
-        cout << "After merge: " << h1->GetEntries() << endl;
         delete h2;
       }
     }
