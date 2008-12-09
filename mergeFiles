@@ -26,6 +26,7 @@ PrintUsage() {
   echo "  --abort-on-copy-error"
   echo "  --copy-timeout=N  (seconds)"
   echo "  --merge-only      (merge whatever files already exist in local cache)"
+  echo "  --use-hadd        (use the root 'hadd' program to do the merge)"
   echo ""
   echo "Note that <mergeName> is taken from the name of the output file."
   echo
@@ -42,7 +43,7 @@ PrintUsage() {
   exit 2
 }
 
-OPTS=`getopt -o "h" -l "help,cache-dir:,match-input-files:,exclude-input-files:,reuse-cache-files,abort-on-copy-error,copy-timeout:,merge-only" -- "$@"`
+OPTS=`getopt -o "h" -l "help,cache-dir:,match-input-files:,exclude-input-files:,reuse-cache-files,abort-on-copy-error,copy-timeout:,merge-only,use-hadd" -- "$@"`
 if [ $? -ne 0 ]; then PrintUsage; fi
 
 eval set -- "$OPTS"
@@ -54,6 +55,7 @@ REUSE_CACHE_FILES=
 ABORT_ON_COPY_ERROR=0
 COPY_TIMEOUT=0
 MERGE_ONLY=0
+USE_HADD=0
 
 while [ ! -z "$1" ]
 do
@@ -67,6 +69,7 @@ do
     --abort-on-copy-error) ABORT_ON_COPY_ERROR=1;;
     --copy-timeout) shift; COPY_TIMEOUT=$1;;
     --merge-only) MERGE_ONLY=1; REUSE_CACHE_FILES=1;;
+    --use-hadd) USE_HADD=1;;
     --) shift; break;;
     *) echo "Unexpected option $1"; PrintUsage;;
   esac
@@ -99,8 +102,12 @@ if [ "$COPY_TIMEOUT" != "0" ]; then
   TIMEOUT_CMD="run-with-timeout --timeout=$COPY_TIMEOUT"
 fi
 
+if [ "$USE_HADD" != "0" ]; then
+  HADD_EXE=hadd
+fi
+
 # Check for some required utilities
-for exe in root dccp $TIMEOUT_EXE; do
+for exe in root dccp $TIMEOUT_EXE $HADD_EXE; do
   if ! which $exe >& /dev/null; then
     echo "Cannot find $exe in PATH.  Your environment is not correctly set up."
     exit 1
@@ -164,7 +171,12 @@ fi
 
 echo
 echo "Merging $files files in $CACHE_DIR into merge file $MERGE_FILE"
-root -b -l -q "$MERGE_C(\"$MERGE_FILE\",\"$CACHE_DIR\")"
+
+if [ "$USE_HADD" = "0" ]; then
+  root -b -l -q "$MERGE_C(\"$MERGE_FILE\",\"$CACHE_DIR\")"
+else
+  hadd "$MERGE_FILE" "$CACHE_DIR"/*
+fi
 
 if [ "$?" != "0" ]; then
   echo "WARNING: the merge command exited with non-zero status"
