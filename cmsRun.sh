@@ -48,6 +48,10 @@ outputFileExists() {
   if [ "$size" != "0" ] && [ "$size" != "" ]; then
     return 0
   fi
+  if [ "$size" = "0" ]; then
+    echo "Cleaning up zero-length destination file $srm_fname."
+    srm-advisory-delete -debug=true -retry_num=0 "$srm_fname"
+  fi
   return 1
 }
 

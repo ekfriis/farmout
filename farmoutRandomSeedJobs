@@ -118,15 +118,17 @@ PrintUsage() {
   echo "  --quick-test             (require low latency scheduling)"
   echo "  --no-monitor             (disable monitoring)"
   echo "  --extra-inputs=file1,file2,...  (e.g. parameter files)"
+  echo "  --accounting-group=name  (username to use for fair-sharing)"
   echo ""
   exit 2
 }
 
-OPTS=`getopt -o "h" -l "help,output-dir:,submit-dir:,no-submit,skip-existing-output,skip-existing-jobs,disk-requirements:,memory-requirements:,save-failed-datafiles,site-requirements:,quick-test,no-monitor,extra-inputs:" -- "$@"`
+OPTS=`getopt -o "h" -l "help,output-dir:,submit-dir:,no-submit,skip-existing-output,skip-existing-jobs,disk-requirements:,memory-requirements:,save-failed-datafiles,site-requirements:,quick-test,no-monitor,extra-inputs:,accounting-group:" -- "$@"`
 if [ $? -ne 0 ]; then PrintUsage; fi
 
 eval set -- "$OPTS"
 
+ACCOUNTING_GROUP=
 NO_SUBMIT=
 OUTPUT_DIR=
 SUBMIT_DIR=
@@ -155,6 +157,7 @@ do
     --quick-test) QUICK_TEST=1;;
     --no-monitor) MONITOR="";;
     --extra-inputs) shift; EXTRA_INPUTS="$1";;
+    --accounting-group) shift; ACCOUNTING_GROUP="+AccountingGroup=$1";;
     --) shift; break;;
     *) die "Unexpected option $1";;
   esac
@@ -342,6 +345,7 @@ ImageSize            = $(($MEMORY_REQUIREMENTS*1000))
 +DiskUsage           = $(($DISK_REQUIREMENTS*1000))
 ${IS_FAST_QUEUE_JOB}
 Requirements         = ${SITE_REQUIREMENTS}
+${ACCOUNTING_GROUP}
 EOF
 
 

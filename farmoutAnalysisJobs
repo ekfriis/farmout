@@ -144,16 +144,18 @@ PrintUsage() {
   echo "  --quick-test             (require low latency scheduling)"
   echo "  --no-monitor             (disable monitoring)"
   echo "  --extra-inputs=file1,file2,...  (e.g. parameter files)"
+  echo "  --accounting-group=name  (username to use for fair-sharing)"
   echo ""
   echo "Note that <runName> is taken from the name of the config file."
   exit 2
 }
 
-OPTS=`getopt -o "h" -l "help,output-dir:,input-dir:,submit-dir:,no-submit,job-count:,skip-existing-output,skip-existing-jobs,match-input-files:,exclude-input-files:,input-files-per-job:,disk-requirements:,memory-requirements:,input-file-list:,input-dbs-path:,save-failed-datafiles,save-missing-input-file-list:,assume-input-files-exist,site-requirements:,quick-test,no-monitor,extra-inputs:" -- "$@"`
+OPTS=`getopt -o "h" -l "help,output-dir:,input-dir:,submit-dir:,no-submit,job-count:,skip-existing-output,skip-existing-jobs,match-input-files:,exclude-input-files:,input-files-per-job:,disk-requirements:,memory-requirements:,input-file-list:,input-dbs-path:,save-failed-datafiles,save-missing-input-file-list:,assume-input-files-exist,site-requirements:,quick-test,no-monitor,extra-inputs:,accounting-group:" -- "$@"`
 if [ $? -ne 0 ]; then PrintUsage; fi
 
 eval set -- "$OPTS"
 
+ACCOUNTING_GROUP=
 NO_SUBMIT=
 JOB_LIMIT=
 SKIP_EXISTING_OUTPUT=
@@ -201,6 +203,7 @@ do
     --quick-test) QUICK_TEST=1;;
     --no-monitor) MONITOR="";;
     --extra-inputs) shift; EXTRA_INPUTS="$1";;
+    --accounting-group) shift; ACCOUNTING_GROUP="+AccountingGroup=$1";;
     --) shift; break;;
     *) die "Unexpected option $1";;
   esac
@@ -404,6 +407,7 @@ on_exit_remove       = (ExitBySignal == FALSE && (ExitCode == 0 || (ExitCode == 
 ImageSize            = $(($MEMORY_REQUIREMENTS*1000))
 +DiskUsage           = $(($DISK_REQUIREMENTS*1000))
 Requirements         = ${SITE_REQUIREMENTS}
+${ACCOUNTING_GROUP}
 EOF
 
 
@@ -418,7 +422,7 @@ if [ "$EXCLUDE_INPUT_FILES" != "" ]; then
   EXCLUDE_ARG="-not -name $EXCLUDE_INPUT_FILES"
 fi
 
-find_command="find $LOCAL_INPUT_DIR -name $MATCH_INPUT_FILES $EXCLUDE_ARG"
+find_command="find $LOCAL_INPUT_DIR -size +0 -name $MATCH_INPUT_FILES $EXCLUDE_ARG"
 
 dbs_query() {
     $DBSCMD_HOME/dbsCommandLine.py -c lsf "$@" | grep /store/
