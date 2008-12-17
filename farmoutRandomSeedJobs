@@ -22,7 +22,7 @@
 SRM_SERVER=srm://cmssrm.hep.wisc.edu:8443
 PNFS_HOME=/pnfs/hep.wisc.edu/store/user/$USER
 
-SRM_HOME=${SRM_SERVER}/${PNFS_HOME}
+SRM_HOME=${SRM_SERVER}${PNFS_HOME}
 
 SITE_REQUIREMENTS='TARGET.HasAFS_OSG =?= True && TARGET.OSRedHatRelease =!= "Scientific Linux SL Release 3.0.4 (SL)"'
 DISK_REQUIREMENTS=2000
@@ -117,7 +117,7 @@ PrintUsage() {
   echo "                           (in <output-dir>-cmsRun-failed)"
   echo "  --quick-test             (require low latency scheduling)"
   echo "  --extra-inputs=file1,file2,...  (e.g. parameter files)"
-  echo "  --accounting-group=name  (username to use for fair-sharing)"
+  echo "  --accounting-group=cms_name  (username to use for fair-sharing)"
   echo ""
   exit 2
 }

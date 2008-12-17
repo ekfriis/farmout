@@ -27,7 +27,7 @@ DCAP_SERVER=dcap://cmsdcap.hep.wisc.edu:22125
 # path to directory containing lfns: /store/...
 PNFS_STORE=/pnfs/hep.wisc.edu
 
-SRM_HOME=${SRM_SERVER}/${PNFS_HOME}
+SRM_HOME=${SRM_SERVER}${PNFS_HOME}
 DCAP_HOME=${DCAP_SERVER}${PNFS_HOME}
 
 SITE_REQUIREMENTS='TARGET.HasAFS_OSG =?= True && TARGET.OSRedHatRelease =!= "Scientific Linux SL Release 3.0.4 (SL)"'
@@ -143,7 +143,7 @@ PrintUsage() {
   echo "  --assume-input-files-exist (do not check file existence at submit time)"
   echo "  --quick-test             (require low latency scheduling)"
   echo "  --extra-inputs=file1,file2,...  (e.g. parameter files)"
-  echo "  --accounting-group=name  (username to use for fair-sharing)"
+  echo "  --accounting-group=cms_name  (username to use for fair-sharing)"
   echo ""
   echo "Note that <runName> is taken from the name of the config file."
   exit 2
@@ -422,7 +422,7 @@ fi
 find_command="find $LOCAL_INPUT_DIR -size +0 -name $MATCH_INPUT_FILES $EXCLUDE_ARG"
 
 dbs_query() {
-    $DBSCMD_HOME/dbsCommandLine.py -c lsf "$@" | grep /store/
+    python $DBSCMD_HOME/dbsCommandLine.py -c lsf "$@" | grep /store/
 }
 if [ "$INPUT_DBS_PATH" != "" ]; then
   find_command="dbs_query --path=$INPUT_DBS_PATH"
