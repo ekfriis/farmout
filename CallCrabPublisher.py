@@ -31,6 +31,7 @@ for option,value in options:
 # initialize some global stuff the CRAB publisher depends on
 Publisher.common.work_space = WorkSpace.WorkSpace(os.getcwd(),cfg_params)
 Publisher.common.logger = crab_logger.Logger()
+Publisher.common.logger.debug_level = 6
 
 p = Publisher.Publisher(cfg_params)
 p.run()

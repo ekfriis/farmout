@@ -172,6 +172,21 @@ if __name__ == '__main__':
 		print "no output file to modify"
 		sys.exit(1)
 
+	# CRAB requires this status == "Success"
+	# would be nice to know if the job _really_ succeeded
+	report.status = "Success"
+
+	# NOTE, ExitCode in the job report is 50117, which means
+	# "could not update exit code in job report"
+	# I think this is the default set by cmssw and it is
+	# supposed to be overridden by the job wrapper.
+	# Currently we are not setting it.  Perhaps we
+	# should save the exit code and file cksum in
+	# a log file (or poke it into the FJR) at runtime
+	# and then fix it up here if necessary.  That way,
+	# the worker node does not need access to the python
+	# code for parsing FJRs.
+
 	for f in report.files:
 		f['LFN'] = os.path.join(lfn_path,f['PFN'])
 		f['PFN'] = os.path.join(pfn_path,f['PFN'])

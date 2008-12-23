@@ -4,7 +4,8 @@
 
 export PYTHONPATH=
 export PATH=/cms/sw/python-2.5/bin:$PATH
-source /cms/sw/CRAB_2_3_1/crab.sh
+#source /cms/sw/CRAB_2_3_1/crab.sh
+source /cms/sw/CRAB_2_4_3/crab.sh
 
 # Initialize default settings:
 
@@ -104,17 +105,69 @@ PrintUsage() {
   echo "  --DataTier=tier (default USER)"
   echo "  --ApplicationFamily=name (default 'output')"
   echo "  --SEName=${SEName}"
+  echo "  --ignore-failed-job-reports"
   echo ""
   echo "The published dataset will be <PrimaryDataset>/<ProcessedDataset>/<DataTier>"
   echo "Example: /PhotonJet_Pt_30_50/CMSSW_2_1_7-more-info/USER"
   exit 2
 }
 
-OPTS=`getopt -o "h" -l "help,dbs-url:,output-dir:,submit-dir:,PrimaryDataset:,ProcessedDataset:,DataTier:,ApplicationFamily:,SEName:,continue" -- "$@"`
+ModifyJobReport() {
+  failed=0
+
+  while read input_fjr; do
+
+    # The publication script is stolen from CRAB.
+    # It expects framework job reports of form res/crab_fjr*.
+    output_fjr=${PUB_DIR}/res/crab_fjr_`basename ${input_fjr}`
+    if [ -f ${output_fjr} ]; then
+      echo "${output_fjr} already exists; skipping"
+      continue
+    fi
+
+    python ${FARMOUT_HOME}/ModifyJobReport.py \
+      --input-fjr=${input_fjr} \
+      --output-fjr=${output_fjr} \
+      --PrimaryDataset=${PrimaryDataset} \
+      --ProcessedDataset=${ProcessedDataset} \
+      --DataTier=${DataTier} \
+      --ApplicationFamily=${ApplicationFamily} \
+      --ApplicationName=${ApplicationName} \
+      --ApplicationVersion=${ApplicationVersion} \
+      --PSetHash=${PSetHash} \
+      --SEName=${SEName} \
+      --pfn-path=${OUTPUT_DIR} \
+      --lfn-path=${LFN_DIR} \
+
+    if [ "$?" != "0" ]; then
+      logerror "Failed to prepare framework job report for publication: ${input_fjr}"
+      rm -f "${output_fjr}"
+      failed=1
+    fi
+
+  done
+
+  if [ "$failed" = 1 ]; then
+    if [ "$IGNORE_FAILED_JOB_REPORTS" = 1 ]; then
+      logerror
+      logerror "WARNING: some framework job reports will be ignored, because they could not be prepared for publication."
+      failed=0
+    else
+      logerror
+      logerror "Aborting publication to DBS, because some job reports could not be processed."
+      logerror "To publish whatever jobs succeeded in the above preparation step, ignoring those that did not, you must specify --ignore-failed-job-reports"
+    fi
+  fi
+
+  return $failed
+}
+
+OPTS=`getopt -o "h" -l "help,dbs-url:,output-dir:,submit-dir:,PrimaryDataset:,ProcessedDataset:,DataTier:,ApplicationFamily:,SEName:,continue,ignore-failed-job-reports" -- "$@"`
 if [ $? -ne 0 ]; then PrintUsage; fi
 
 eval set -- "$OPTS"
 
+IGNORE_FAILED_JOB_REPORTS=0
 OUTPUT_DIR=
 SUBMIT_DIR=
 CFG_EXTENSION=
@@ -142,6 +195,7 @@ do
     --ApplicationFamily) shift; ApplicationFamily=$1;;
     --SEName) shift; SEName=$1;;
     --continue) CONTINUE_PUB=1;;
+    --ignore-failed-job-reports) IGNORE_FAILED_JOB_REPORTS=1;;
     --) shift; break;;
     *) die "Unexpected option $1";;
   esac
@@ -222,33 +276,7 @@ fi
 
 mkdir -p ${PUB_DIR}/res
 
-find ${SUBMIT_DIR} -name \*.xml |
-while read input_fjr; do
-
-  # The publication script is stolen from CRAB.
-  # It expects framework job reports of form res/crab_fjr*.
-  output_fjr=${PUB_DIR}/res/crab_fjr_`basename ${input_fjr}`
-  if [ -f ${output_fjr} ]; then
-    echo "${output_fjr} already exists; skipping"
-    continue
-  fi
-
-  python ${FARMOUT_HOME}/ModifyJobReport.py \
-    --input-fjr=${input_fjr} \
-    --output-fjr=${output_fjr} \
-    --PrimaryDataset=${PrimaryDataset} \
-    --ProcessedDataset=${ProcessedDataset} \
-    --DataTier=${DataTier} \
-    --ApplicationFamily=${ApplicationFamily} \
-    --ApplicationName=${ApplicationName} \
-    --ApplicationVersion=${ApplicationVersion} \
-    --PSetHash=${PSetHash} \
-    --SEName=${SEName} \
-    --pfn-path=${OUTPUT_DIR} \
-    --lfn-path=${LFN_DIR} \
-  || die "Failed to prepare framework job report for publication: ${input_fjr}"
-
-done || exit 1
+find ${SUBMIT_DIR} -name \*.xml | ModifyJobReport || exit 1
 
 
 cd ${PUB_DIR} || die
