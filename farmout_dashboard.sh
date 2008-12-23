@@ -129,7 +129,7 @@ fi
 # "[number]_https://[sid] if sid does not begin with https.  I found
 # this by trial and error, and by looking at how CRAB does things.
 # Without this, the completion time of the job never gets updated.
-# dboard_jobId="${dboard_jobId}_${dboard_sid}"
+dboard_jobId="${dboard_jobId}_${dboard_sid}"
 
 task=$1
 
