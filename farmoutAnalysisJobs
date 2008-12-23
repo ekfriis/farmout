@@ -200,7 +200,7 @@ do
     --site-requirements) shift; SITE_REQUIREMENTS="$1";;
     --quick-test) QUICK_TEST=1;;
     --extra-inputs) shift; EXTRA_INPUTS="$1";;
-    --accounting-group) shift; ACCOUNTING_GROUP="+AccountingGroup=$1";;
+    --accounting-group) shift; ACCOUNTING_GROUP="+AccountingGroup=\"$1\"";;
     --) shift; break;;
     *) die "Unexpected option $1";;
   esac
