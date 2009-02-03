@@ -99,6 +99,7 @@ OPTIONS:
 --SEName
 --pfn-path
 --lfn-path
+--strip-input-file-info   (do not publish info about input files)
 """
 	sys.stderr.write(msg)
 
@@ -121,9 +122,12 @@ if __name__ == '__main__':
 		"PSetHash=",
 		"SEName=",
 		"pfn-path=",
-		"lfn-path="
+		"lfn-path=",
+		"strip-input-file-info"
 	]
 	options,args = getopt.getopt(sys.argv[1:],"h",long_options)
+
+	strip_input_file_info = 0
 
 	for option,value in options:
 		if option == "--help" or option == "-h":
@@ -153,6 +157,8 @@ if __name__ == '__main__':
 			pfn_path = value
 		elif option == "--lfn-path":
 			lfn_path = value
+		elif option == "--strip-input-file-info":
+			strip_input_file_info = 1
 		else:
 			sys.stderr.write("Unexpected option: " + str(option) + "\n")
 			sys.exit(2)
@@ -195,6 +201,9 @@ if __name__ == '__main__':
 		#Generate per file stats
 		addFileStats(f)
 
+		if strip_input_file_info:
+			f.inputFiles = []
+
 		datasetinfo=f.newDataset()
 		datasetinfo['PrimaryDataset'] = PrimaryDataset 
 		datasetinfo['DataTier'] = DataTier 
@@ -204,6 +213,9 @@ if __name__ == '__main__':
 		datasetinfo['ApplicationVersion'] = ApplicationVersion
 		datasetinfo['PSetHash'] = PSetHash
 
-	# After modifying the report, you can then save it to a file.
+	if strip_input_file_info:
+		report.inputFiles = []
+
+	# After modifying the report, save it to a file.
 	report.write(outputReport)
 	print "Wrote modified report to " + outputReport

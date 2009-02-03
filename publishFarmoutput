@@ -106,6 +106,7 @@ PrintUsage() {
   echo "  --ApplicationFamily=name (default 'output')"
   echo "  --SEName=${SEName}"
   echo "  --ignore-failed-job-reports"
+  echo "  --strip-input-file-info  (do not publish info about input files)"
   echo ""
   echo "The published dataset will be <PrimaryDataset>/<ProcessedDataset>/<DataTier>"
   echo "Example: /PhotonJet_Pt_30_50/CMSSW_2_1_7-more-info/USER"
@@ -138,6 +139,7 @@ ModifyJobReport() {
       --SEName=${SEName} \
       --pfn-path=${OUTPUT_DIR} \
       --lfn-path=${LFN_DIR} \
+      ${STRIP_INPUT_FILE_INFO}
 
     if [ "$?" != "0" ]; then
       logerror "Failed to prepare framework job report for publication: ${input_fjr}"
@@ -162,7 +164,7 @@ ModifyJobReport() {
   return $failed
 }
 
-OPTS=`getopt -o "h" -l "help,dbs-url:,output-dir:,submit-dir:,PrimaryDataset:,ProcessedDataset:,DataTier:,ApplicationFamily:,SEName:,continue,ignore-failed-job-reports" -- "$@"`
+OPTS=`getopt -o "h" -l "help,dbs-url:,output-dir:,submit-dir:,PrimaryDataset:,ProcessedDataset:,DataTier:,ApplicationFamily:,SEName:,continue,ignore-failed-job-reports,strip-input-file-info" -- "$@"`
 if [ $? -ne 0 ]; then PrintUsage; fi
 
 eval set -- "$OPTS"
@@ -179,6 +181,7 @@ DataTier=USER
 ApplicationFamily=output
 ApplicationName=cmsRun
 CONTINUE_PUB=0
+STRIP_INPUT_FILE_INFO=""
 
 
 while [ ! -z "$1" ]
@@ -196,6 +199,7 @@ do
     --SEName) shift; SEName=$1;;
     --continue) CONTINUE_PUB=1;;
     --ignore-failed-job-reports) IGNORE_FAILED_JOB_REPORTS=1;;
+    --strip-input-file-info) STRIP_INPUT_FILE_INFO="--strip-input-file-info";;
     --) shift; break;;
     *) die "Unexpected option $1";;
   esac
