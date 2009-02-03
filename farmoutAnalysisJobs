@@ -144,12 +144,13 @@ PrintUsage() {
   echo "  --quick-test             (require low latency scheduling)"
   echo "  --extra-inputs=file1,file2,...  (e.g. parameter files)"
   echo "  --accounting-group=cms_name  (username to use for fair-sharing)"
+  echo "  --requires-whole-machine (job should reserve all slots on machine)"
   echo ""
   echo "Note that <runName> is taken from the name of the config file."
   exit 2
 }
 
-OPTS=`getopt -o "h" -l "help,output-dir:,input-dir:,submit-dir:,no-submit,job-count:,skip-existing-output,skip-existing-jobs,match-input-files:,exclude-input-files:,input-files-per-job:,disk-requirements:,memory-requirements:,input-file-list:,input-dbs-path:,save-failed-datafiles,save-missing-input-file-list:,assume-input-files-exist,site-requirements:,quick-test,extra-inputs:,accounting-group:" -- "$@"`
+OPTS=`getopt -o "h" -l "help,output-dir:,input-dir:,submit-dir:,no-submit,job-count:,skip-existing-output,skip-existing-jobs,match-input-files:,exclude-input-files:,input-files-per-job:,disk-requirements:,memory-requirements:,input-file-list:,input-dbs-path:,save-failed-datafiles,save-missing-input-file-list:,assume-input-files-exist,site-requirements:,quick-test,extra-inputs:,accounting-group:,requires-whole-machine" -- "$@"`
 if [ $? -ne 0 ]; then PrintUsage; fi
 
 eval set -- "$OPTS"
@@ -173,6 +174,7 @@ ASSUME_INPUT_FILES_EXIST=
 CFG_EXTENSION=
 QUICK_TEST=
 EXTRA_INPUTS=
+REQUIRES_WHOLE_MACHINE=
 
 
 while [ ! -z "$1" ]
@@ -201,6 +203,7 @@ do
     --quick-test) QUICK_TEST=1;;
     --extra-inputs) shift; EXTRA_INPUTS="$1";;
     --accounting-group) shift; ACCOUNTING_GROUP="+AccountingGroup=\"$1\"";;
+    --requires-whole-machine) REQUIRES_WHOLE_MACHINE=1;;
     --) shift; break;;
     *) die "Unexpected option $1";;
   esac
@@ -389,6 +392,15 @@ if [ "$SAVE_FAILED_DATAFILES" != "" ]; then
   save_failed_datafiles_env="SAVE_FAILED_DATAFILES=1"
 fi
 
+if [ "$REQUIRES_WHOLE_MACHINE" == "1" ]; then
+  REQUIRES_WHOLE_MACHINE_ATTR="+RequiresWholeMachine=true"
+
+  #Note: the reference to per-slot Memory and Disk below are to prevent
+  #condor from inserting the default requirements for these.  Instead,
+  #we want to look at whole machine attributes.
+  SITE_REQUIREMENTS="${SITE_REQUIREMENTS} && TARGET.CAN_RUN_WHOLE_MACHINE && TARGET.TotalMemory*1024 >= MY.ImageSize && TARGET.Memory > 0 && TARGET.TotalDisk >= MY.DiskUsage && TARGET.Disk > 0"
+fi
+
 # First put all the submit file commands that are the same for all jobs.
     cat <<EOF > $submitFile
 X509UserProxy        = ${proxy}
@@ -405,6 +417,7 @@ ImageSize            = $(($MEMORY_REQUIREMENTS*1000))
 +DiskUsage           = $(($DISK_REQUIREMENTS*1000))
 Requirements         = ${SITE_REQUIREMENTS}
 ${ACCOUNTING_GROUP}
+${REQUIRES_WHOLE_MACHINE_ATTR}
 EOF
 
 
