@@ -33,6 +33,8 @@ DCAP_HOME=${DCAP_SERVER}${PNFS_HOME}
 SITE_REQUIREMENTS='TARGET.HasAFS_OSG =?= True && TARGET.OSRedHatRelease =!= "Scientific Linux SL Release 3.0.4 (SL)"'
 DISK_REQUIREMENTS=2000
 MEMORY_REQUIREMENTS=1200
+HOLD_IMAGE_SIZE_FACTOR=4.0
+HOLD_DISK_USAGE_FACTOR=10.0
 MIN_PROXY_HOURS=24
 
 # special exit status to force job to leave the queue
@@ -413,9 +415,11 @@ Notification         = never
 WhenToTransferOutput = On_Exit
 on_exit_remove       = (ExitBySignal == FALSE && (ExitCode == 0 || (ExitCode == ${FAIL_JOB} && JobRunCount>3)))
 +IsFastQueueJob      = True
-ImageSize            = $(($MEMORY_REQUIREMENTS*1000))
-+DiskUsage           = $(($DISK_REQUIREMENTS*1000))
+ImageSize            = $(($MEMORY_REQUIREMENTS*1024))
++DiskUsage           = $(($DISK_REQUIREMENTS*1024))
 Requirements         = ${SITE_REQUIREMENTS}
+# stop jobs from running if they blow up
+periodic_hold        = ImageSize/1024 > ${HOLD_IMAGE_SIZE_FACTOR}*${MEMORY_REQUIREMENTS} || DiskUsage/1024 > ${HOLD_DISK_USAGE_FACTOR}*${DISK_REQUIREMENTS}
 ${ACCOUNTING_GROUP}
 ${REQUIRES_WHOLE_MACHINE_ATTR}
 EOF
