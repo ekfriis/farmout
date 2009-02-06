@@ -31,6 +31,10 @@ HOLD_IMAGE_SIZE_FACTOR=4.0
 HOLD_DISK_USAGE_FACTOR=10.0
 MIN_PROXY_HOURS=24
 
+# We want explicit references to "app_rw" to be replaced with "app"
+# so the interactive osg app volume is not pounded by the jobs.
+SITE_ENV_MATCH_REPLACE_1='s|/afs/hep.wisc.edu/osg/app_[^/]*/|/afs/hep.wisc.edu/osg/app/|g'
+
 # special exit status to force job to leave the queue
 FAIL_JOB=42
 
@@ -270,6 +274,12 @@ eval `scramv1 runtime -sh`
 if [ "$?" != "0" ]; then
   die "Failed to initialize CMSSW environment with scram in $CMSSW_HOME."
 fi
+
+for mr_name in ${!SITE_ENV_MATCH_REPLACE*}; do
+    mr="${!mr_name}"
+    # apply search-replace to the environment
+    eval `env | sed "$mr" | sed 's/"/\\\\"/g' | sed 's/\\([^=]*\\)=\\(.*\\)/export \\1="\\2"/'`
+done
 
 OUTPUT_DIR=${OUTPUT_DIR:-${SRM_HOME}/$jobName}
 SUBMIT_DIR=${SUBMIT_DIR:-${SUBMIT_HOME}/$jobName}
