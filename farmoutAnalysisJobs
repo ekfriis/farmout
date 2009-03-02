@@ -151,12 +151,13 @@ PrintUsage() {
   echo "  --extra-inputs=file1,file2,...  (e.g. parameter files)"
   echo "  --accounting-group=cms_name  (username to use for fair-sharing)"
   echo "  --requires-whole-machine (job should reserve all slots on machine)"
+  echo "  --fwklite                (in this case, provide script instead of config)"
   echo ""
   echo "Note that <runName> is taken from the name of the config file."
   exit 2
 }
 
-OPTS=`getopt -o "h" -l "help,output-dir:,input-dir:,submit-dir:,no-submit,job-count:,skip-existing-output,skip-existing-jobs,match-input-files:,exclude-input-files:,input-files-per-job:,disk-requirements:,memory-requirements:,input-file-list:,input-dbs-path:,save-failed-datafiles,save-missing-input-file-list:,assume-input-files-exist,site-requirements:,quick-test,extra-inputs:,accounting-group:,requires-whole-machine" -- "$@"`
+OPTS=`getopt -o "h" -l "help,output-dir:,input-dir:,submit-dir:,no-submit,job-count:,skip-existing-output,skip-existing-jobs,match-input-files:,exclude-input-files:,input-files-per-job:,disk-requirements:,memory-requirements:,input-file-list:,input-dbs-path:,save-failed-datafiles,save-missing-input-file-list:,assume-input-files-exist,site-requirements:,quick-test,extra-inputs:,accounting-group:,requires-whole-machine,fwklite" -- "$@"`
 if [ $? -ne 0 ]; then PrintUsage; fi
 
 eval set -- "$OPTS"
@@ -181,6 +182,8 @@ CFG_EXTENSION=
 QUICK_TEST=
 EXTRA_INPUTS=
 REQUIRES_WHOLE_MACHINE=
+FWKLITE=
+APPLICATION=cmsRun
 
 
 while [ ! -z "$1" ]
@@ -210,14 +213,12 @@ do
     --extra-inputs) shift; EXTRA_INPUTS="$1";;
     --accounting-group) shift; ACCOUNTING_GROUP="+AccountingGroup=\"$1\"";;
     --requires-whole-machine) REQUIRES_WHOLE_MACHINE=1;;
+    --fwklite) FWKLITE=1; APPLICATION=fwklite;;
     --) shift; break;;
     *) die "Unexpected option $1";;
   esac
   shift
 done
-
-if [ "$#" -ne 3 ]; then PrintUsage; fi
-
 
 # Check for some required utilities
 for exe in scramv1 condor_submit cmsRun.sh readlink voms-proxy-info ; do
@@ -225,6 +226,9 @@ for exe in scramv1 condor_submit cmsRun.sh readlink voms-proxy-info ; do
     die "Cannot find $exe in PATH.  Your environment is not correctly set up."
   fi
 done
+
+if [ "$#" -ne 3 ]; then PrintUsage; fi
+
 
 # Additional command-line arguments
 
@@ -251,15 +255,17 @@ fi
 
 CFG_EXTENSION="${configTemplate/*./}"
 
-if [ "$CFG_EXTENSION" != "py" ] && [ "$CFG_EXTENSION" != "cfg" ]; then
-  die "cfg template must end in .py or .cfg"
-fi
-
-for macro in \$inputFileNames \$outputFileName; do
-  if ! grep -F -q $macro $configTemplate; then
-    die "$macro must appear on the configuration template.  I can't find it in $configTemplate"
+if [ "$FWKLITE" != 1 ]; then
+  if [ "$CFG_EXTENSION" != "py" ] && [ "$CFG_EXTENSION" != "cfg" ]; then
+    die "cfg template must end in .py or .cfg"
   fi
-done
+
+  for macro in \$inputFileNames \$outputFileName; do
+    if ! grep -F -q $macro $configTemplate; then
+      die "$macro must appear on the configuration template.  I can't find it in $configTemplate"
+    fi
+  done
+fi
 
 
 runName=`basename $configTemplate .${CFG_EXTENSION}`
@@ -386,7 +392,7 @@ dboard_jobId=\$(Process)
 dboard_sid=\$\$([GlobalJobId])
 ${dboard_datasetFull}
 dboard_application=`basename ${CMSSW_HOME}`
-dboard_exe=cmsRun
+dboard_exe=${APPLICATION}
 dboard_tool=farmout
 dboard_scheduler=local-condor
 dboard_taskType=analysis
@@ -404,6 +410,20 @@ if [ "$SAVE_FAILED_DATAFILES" != "" ]; then
   save_failed_datafiles_env="SAVE_FAILED_DATAFILES=1"
 fi
 
+if [ "$FWKLITE" = 1 ]; then
+  # The "configTemplate" in this case is actually the fwklite script.
+
+  # This causes it to run the fwklite script rather than running
+  # cmsRun.
+  fwklite_env="FWKLITE_SCRIPT=$(basename ${configTemplate})"
+
+  # add the fwklite script to the input files to be transferred to the job
+  if [ "$EXTRA_INPUTS" != "" ]; then
+    EXTRA_INPUTS="${EXTRA_INPUTS},"
+  fi
+  EXTRA_INPUTS="${EXTRA_INPUTS}${configTemplate}"
+fi
+
 if [ "$REQUIRES_WHOLE_MACHINE" == "1" ]; then
   REQUIRES_WHOLE_MACHINE_ATTR="+RequiresWholeMachine=true"
 
@@ -419,7 +439,7 @@ X509UserProxy        = ${proxy}
 Universe             = vanilla
 Executable           = $Executable
 GetEnv               = true
-Environment          = "${dboard} ${save_failed_datafiles_env}"
+Environment          = "${dboard} ${save_failed_datafiles_env} ${fwklite_env}"
 Copy_To_Spool        = false
 Notification         = never
 WhenToTransferOutput = On_Exit
@@ -516,7 +536,11 @@ do
     conlog=$jobtag.log
     stdout=$jobtag.out
     stderr=$jobtag.err
-    jobcfg=$jobtag.$CFG_EXTENSION
+    if [ "$FWKLITE" = 1 ]; then
+      jobcfg=$jobtag.inputs
+    else
+      jobcfg=$jobtag.$CFG_EXTENSION
+    fi
     outputFileName=$jobtag.root
     inputfiles="$jobcfg"
     if [ "$EXTRA_INPUTS" != "" ]; then
@@ -559,9 +583,16 @@ do
 # Prepare job configuration file
 #
 
-    sed < $configTemplate \
-        "s|\\\$inputFileNames|$inputFileNames|g;
-         s|\\\$outputFileName|$outputFileName|g" > $jobcfg
+    if [ "$FWKLITE" != 1 ]; then
+      sed < $configTemplate \
+          "s|\\\$inputFileNames|$inputFileNames|g;
+           s|\\\$outputFileName|$outputFileName|g" > $jobcfg
+    else
+      # convert quoted comma-separated inputfile list to newline-separated
+      echo "$inputFileNames" | sed \
+        "s|\"||g;
+         s|,|\n|g" > $jobcfg
+    fi
 
 #
 # Prepare condor submit file for the job

@@ -121,14 +121,29 @@ df .
 
 start_time=`date "+%s"`
 
+cmsRun=cmsRun
+
 for cfg in ${jobcfgs//,/ }; do
-  echo "farmout: starting cmsRun $cfg at `date`"
+  if [ "$FWKLITE_SCRIPT" != "" ]; then
+    cmsRun="./$FWKLITE_SCRIPT"
+    export INPUT="$cfg"
+    export OUTPUT="$datafile"
+    echo "farmout: starting $cmsRun with INPUT=$INPUT and OUTPUT=$OUTPUT at `date`"
 
-  jobreport="${cfg%.*}.xml"
-  cmsRun --jobreport=$jobreport $cfg
-  cmsRun_rc=$?
+    chmod a+x $cmsRun
+    $cmsRun
+    cmsRun_rc=$?
 
-  echo "farmout: cmsRun $cfg exited with status $cmsRun_rc at `date`"
+    echo "farmout: $cmsRun exited with status $cmsRun_rc at `date`"
+  else
+    echo "farmout: starting cmsRun $cfg at `date`"
+
+    jobreport="${cfg%.*}.xml"
+    cmsRun --jobreport=$jobreport $cfg
+    cmsRun_rc=$?
+
+    echo "farmout: cmsRun $cfg exited with status $cmsRun_rc at `date`"
+  fi
 
   echo "ls -ltr . intermediate"
   ls -ltr . intermediate
@@ -142,7 +157,7 @@ done
 export dboard_ExeTime=$((`date "+%s"` -  $start_time))
 
 if [ "$cmsRun_rc" != "0" ]; then
-  echo "cmsRun exited with status $cmsRun_rc"
+  echo "$cmsRun exited with status $cmsRun_rc"
   if [ -f $datafile ] && [ "$SAVE_FAILED_DATAFILES" = "1" ]; then
     if ! DoSrmcp "file://localhost/`pwd`/$datafile" "$SRM_FAILED_OUTPUT_FILE"; then
       echo "Failed to save datafile from failed run."
@@ -159,7 +174,7 @@ fi
 
 
 if ! [ -f $datafile ]; then
-  echo "cmsRun did not produce expected datafile $datafile"
+  echo "$cmsRun did not produce expected datafile $datafile"
   exit $FAIL_JOB
 fi
 
