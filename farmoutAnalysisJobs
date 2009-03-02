@@ -443,7 +443,7 @@ Environment          = "${dboard} ${save_failed_datafiles_env} ${fwklite_env}"
 Copy_To_Spool        = false
 Notification         = never
 WhenToTransferOutput = On_Exit
-on_exit_remove       = (ExitBySignal == FALSE && (ExitCode == 0 || (ExitCode == ${FAIL_JOB} && JobRunCount>3)))
+on_exit_remove       = (ExitBySignal == FALSE && (ExitCode == 0 || (ExitCode == ${FAIL_JOB} && NumJobStarts>3))) || (NumJobStarts>6)
 +IsFastQueueJob      = True
 ImageSize            = $(($MEMORY_REQUIREMENTS*1024))
 +DiskUsage           = $(($DISK_REQUIREMENTS*1024))
