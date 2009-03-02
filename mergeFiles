@@ -143,7 +143,6 @@ for dir; do
       echo "Already in local cache: `basename $fname`."
     else
       echo "(${CURRENT_FILE}/${TOTAL_FILES}): Copying `basename $fname` to local cache."
-      let "CURRENT_FILE += 1"
 
       $TIMEOUT_CMD dccp $fname $dest_fname
       rc=$?
@@ -160,8 +159,16 @@ for dir; do
         echo "WARNING: the following command failed ($desc): dccp $fname $dest_fname"
       fi
     fi
+
+    let "CURRENT_FILE += 1"
+
   done
 done
+
+# check that the above loop (which executes in a sub-shell) succeeded
+if [ "$?" -ne 0 ]; then
+  exit 1
+fi
 
 files=`find $CACHE_DIR -type f -print | awk 'BEGIN{N=0} {N=N+1} END{print N}'`
 if ! [ "$files" -gt "0" ]; then
