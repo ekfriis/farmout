@@ -164,7 +164,7 @@ listAllJobs() {
 ##################################################
 listCondorJobs() {
  echo "Currently on condor:"
- echo `condor_q "$USER" | tail -1`
+ echo `condor_q "$USER" 2> /dev/null | tail -1`
  echo
 }
 ##################################################

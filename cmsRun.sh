@@ -126,6 +126,7 @@ cmsRun=cmsRun
 for cfg in ${jobcfgs//,/ }; do
   if [ "$FWKLITE_SCRIPT" != "" ]; then
     cmsRun="./$FWKLITE_SCRIPT"
+    chmod a+x $cmsRun
     if [ "${cmsRun/*./.}" = ".C" ]; then
       cmsRun="root -q -b $cmsRun"
     fi
@@ -133,7 +134,6 @@ for cfg in ${jobcfgs//,/ }; do
     export OUTPUT="$datafile"
     echo "farmout: starting $cmsRun with INPUT=$INPUT and OUTPUT=$OUTPUT at `date`"
 
-    chmod a+x $cmsRun
     $cmsRun
     cmsRun_rc=$?
 
