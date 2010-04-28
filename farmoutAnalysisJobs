@@ -44,13 +44,11 @@ SITE_ENV_MATCH_REPLACE_1='s|/afs/hep.wisc.edu/osg/app_[^/]*/|/afs/hep.wisc.edu/o
 # special exit status to force job to leave the queue
 FAIL_JOB=42
 
-scratch_dir="/data"
-if ! [ -d $scratch_dir ]; then
-  scratch_dir="/scratch"
-fi
-if ! [ -d $scratch_dir ]; then
-  scratch_dir="/tmp"
-fi
+for scratch_dir in /data /scratch /tmp; do
+  if [ -d $scratch_dir ] && [ -w $scratch_dir ]; then
+    break
+  fi
+done
 SUBMIT_HOME=${scratch_dir}/$USER
 
 basename() {
