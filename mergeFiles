@@ -1,12 +1,10 @@
 #!/bin/sh
 
-scratch_dir="/data"
-if ! [ -d $scratch_dir ]; then
-  scratch_dir="/scratch"
-fi
-if ! [ -d $scratch_dir ]; then
-  scratch_dir="/tmp"
-fi
+for scratch_dir in /data /scratch /tmp; do
+  if [ -d $scratch_dir ] && [ -w $scratch_dir ]; then
+    break
+  fi
+done
 CACHE_HOME=${scratch_dir}/$USER
 
 die() {
