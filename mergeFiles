@@ -70,7 +70,7 @@ do
     --copy-timeout) shift; COPY_TIMEOUT=$1;;
     --merge-only) MERGE_ONLY=1; REUSE_CACHE_FILES=1;;
     --use-hadd) USE_HADD=1;;
-    --parallel) PARALLEL=$1;;
+    --parallel) shift; PARALLEL=$1;;
     --) shift; break;;
     *) echo "Unexpected option $1"; PrintUsage;;
   esac
