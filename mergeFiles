@@ -23,6 +23,7 @@ PrintUsage() {
   echo "  --reuse-cache-files"
   echo "  --abort-on-copy-error"
   echo "  --copy-timeout=N  (seconds)"
+  echo "  --parallel=N      (number of files to copy in parallel; default 3)"
   echo "  --merge-only      (merge whatever files already exist in local cache)"
   echo "  --use-hadd        (use the root 'hadd' program to do the merge)"
   echo ""
@@ -41,7 +42,7 @@ PrintUsage() {
   exit 2
 }
 
-OPTS=`getopt -o "h" -l "help,cache-dir:,match-input-files:,exclude-input-files:,reuse-cache-files,abort-on-copy-error,copy-timeout:,merge-only,use-hadd" -- "$@"`
+OPTS=`getopt -o "h" -l "help,cache-dir:,match-input-files:,exclude-input-files:,reuse-cache-files,abort-on-copy-error,copy-timeout:,merge-only,use-hadd,parallel:" -- "$@"`
 if [ $? -ne 0 ]; then PrintUsage; fi
 
 eval set -- "$OPTS"
@@ -54,6 +55,7 @@ ABORT_ON_COPY_ERROR=0
 COPY_TIMEOUT=0
 MERGE_ONLY=0
 USE_HADD=0
+PARALLEL=3
 
 while [ ! -z "$1" ]
 do
@@ -68,6 +70,7 @@ do
     --copy-timeout) shift; COPY_TIMEOUT=$1;;
     --merge-only) MERGE_ONLY=1; REUSE_CACHE_FILES=1;;
     --use-hadd) USE_HADD=1;;
+    --parallel) PARALLEL=$1;;
     --) shift; break;;
     *) echo "Unexpected option $1"; PrintUsage;;
   esac
@@ -95,17 +98,12 @@ if [ -d "$CACHE_DIR" ]; then
   fi
 fi
 
-if [ "$COPY_TIMEOUT" != "0" ]; then
-  TIMEOUT_EXE=run-with-timeout
-  TIMEOUT_CMD="run-with-timeout --timeout=$COPY_TIMEOUT"
-fi
-
 if [ "$USE_HADD" != "0" ]; then
   HADD_EXE=hadd
 fi
 
 # Check for some required utilities
-for exe in root dccp $TIMEOUT_EXE $HADD_EXE; do
+for exe in root dccp dccp_many $HADD_EXE; do
   if ! which $exe >& /dev/null; then
     echo "Cannot find $exe in PATH.  Your environment is not correctly set up."
     exit 1
@@ -122,6 +120,10 @@ if ! [ -f $MERGE_C ]; then
   exit 1
 fi
 
+FILE_LIST=/tmp/mergeFiles_file_list.$$
+rm -f $FILE_LIST
+touch $FILE_LIST || die "Failed to write to $FILE_LIST."
+
 mkdir -p $CACHE_DIR || die "Failed to create $CACHE_DIR."
 
 for dir; do
@@ -132,7 +134,6 @@ for dir; do
   fi
 
   TOTAL_FILES=`find $dir -type f -name "$MATCH_INPUT_FILES" $EXCLUDE_OPTION | wc --lines`
-  CURRENT_FILE=1
 
   find $dir -type f -name "$MATCH_INPUT_FILES" $EXCLUDE_OPTION |
   while read fname; do
@@ -140,32 +141,33 @@ for dir; do
     if [ -s $dest_fname ]; then
       echo "Already in local cache: `basename $fname`."
     else
-      echo "(${CURRENT_FILE}/${TOTAL_FILES}): Copying `basename $fname` to local cache."
-
-      $TIMEOUT_CMD dccp $fname $dest_fname
-      rc=$?
-      if [ "$rc" != 0 ]; then
-        desc="status $rc"
-	rm -f $dest_fname
-        if [ "$rc" = "142" ]; then
-          desc="timed out after $COPY_TIMEOUT seconds"
-        fi
-        if [ "$ABORT_ON_COPY_ERROR" = 1 ]; then
-          echo "ERROR: the following command failed ($desc): dccp $fname $dest_fname"
-          exit 1
-        fi
-        echo "WARNING: the following command failed ($desc): dccp $fname $dest_fname"
-      fi
+      echo $fname $dest_fname >> $FILE_LIST
     fi
-
-    let "CURRENT_FILE += 1"
-
   done
 done
 
 # check that the above loop (which executes in a sub-shell) succeeded
 if [ "$?" -ne 0 ]; then
+  rm -f $FILE_LIST
   exit 1
+fi
+
+if [ "$ABORT_ON_COPY_ERROR" = 0 ]; then
+  CONTINUE_ON_ERROR_ARG=--continue_on_error
+fi
+
+dccp_many --copyjobfile=$FILE_LIST --copy_timeout=$COPY_TIMEOUT $CONTINUE_ON_ERROR_ARG --parallel=$PARALLEL
+
+dccp_rc=$?
+
+rm -f $FILE_LIST
+
+if [ $dccp_rc != 0 ]; then
+  if [ "$ABORT_ON_COPY_ERROR" = 1 ]; then
+    echo "Aborting because the copying of some files failed."
+    exit 1
+  fi
+  echo "WARNING: the copying of some files failed, but --abort-on-copy-error was not specified, so continuing with the merge."
 fi
 
 files=`find $CACHE_DIR -type f -print | awk 'BEGIN{N=0} {N=N+1} END{print N}'`
