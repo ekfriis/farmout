@@ -15,6 +15,8 @@ fi
 # special exit status to force job to leave the queue
 FAIL_JOB=42
 
+SRM_TIMEOUT=3600
+
 # core files have a nasty habit of filling up disks and causing trouble,
 # so disable them.
 ulimit -c 0
@@ -55,6 +57,34 @@ outputFileExists() {
   return 1
 }
 
+RunWithTimeout() {
+    timeout=$1
+    shift
+
+    "$@" &
+    PID=$!
+
+    start=`date "+%s"`
+    soft_timeout_time=$(($start + $timeout))
+    hard_timeout_time=$(($start + $timeout + 60))
+    while [ 1 ]; do
+        if ! kill -0 $PID >& /dev/null; then
+            wait $PID
+            return
+        fi
+        now=`date "+%s"`
+        if [ $now -gt $hard_timeout_time ]; then
+            echo "Hard killing pid $PID." 2>&1
+            kill -9 $PID
+        elif [ $now -gt $soft_timeout_time ]; then
+            echo "Timed out after waiting $timeout seconds." 2>&1
+            kill $PID
+            soft_timeout_time=$hard_timeout_time
+        fi
+        sleep 1
+    done
+}
+
 DoSrmcp() {
     src="$1"
     dest="$2"
@@ -70,7 +100,7 @@ DoSrmcp() {
         echo "Trying again at `date`: srmcp $src $dest"
       fi
 
-      srmcp -debug=true -retry_num=0 "$src" "$dest"
+      RunWithTimeout $SRM_TIMEOUT srmcp -debug=true -retry_num=0 "$src" "$dest"
       rc=$?
 
       if [ "$rc" = "0" ]; then
