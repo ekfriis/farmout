@@ -151,12 +151,13 @@ PrintUsage() {
   echo "  --accounting-group=cms_name  (username to use for fair-sharing)"
   echo "  --requires-whole-machine (job should reserve all slots on machine)"
   echo "  --fwklite                (in this case, provide script instead of config)"
+  echo "  --output-files-per-subdir=N (0 for infinite)"
   echo ""
   echo "Note that <runName> is taken from the name of the config file."
   exit 2
 }
 
-OPTS=`getopt -o "h" -l "help,output-dir:,input-dir:,submit-dir:,no-submit,job-count:,skip-existing-output,skip-existing-jobs,match-input-files:,exclude-input-files:,input-files-per-job:,disk-requirements:,memory-requirements:,input-file-list:,input-dbs-path:,input-runs:,save-failed-datafiles,save-missing-input-file-list:,assume-input-files-exist,site-requirements:,quick-test,extra-inputs:,accounting-group:,requires-whole-machine,fwklite" -- "$@"`
+OPTS=`getopt -o "h" -l "help,output-dir:,input-dir:,submit-dir:,no-submit,job-count:,skip-existing-output,skip-existing-jobs,match-input-files:,exclude-input-files:,input-files-per-job:,disk-requirements:,memory-requirements:,input-file-list:,input-dbs-path:,input-runs:,save-failed-datafiles,save-missing-input-file-list:,assume-input-files-exist,site-requirements:,quick-test,extra-inputs:,accounting-group:,requires-whole-machine,fwklite,output-files-per-subdir:" -- "$@"`
 if [ $? -ne 0 ]; then PrintUsage; fi
 
 eval set -- "$OPTS"
@@ -184,6 +185,7 @@ EXTRA_INPUTS=
 REQUIRES_WHOLE_MACHINE=
 FWKLITE=
 APPLICATION=cmsRun
+OUTPUT_FILES_PER_SUBDIR=0
 
 
 while [ ! -z "$1" ]
@@ -215,6 +217,7 @@ do
     --accounting-group) shift; ACCOUNTING_GROUP="+AccountingGroup=\"$1\"";;
     --requires-whole-machine) REQUIRES_WHOLE_MACHINE=1;;
     --fwklite) FWKLITE=1; APPLICATION=fwklite;;
+    --output-files-per-subdir) shift; OUTPUT_FILES_PER_SUBDIR=$1;;
     --) shift; break;;
     *) die "Unexpected option $1";;
   esac
@@ -502,6 +505,7 @@ if [ "$INPUT_FILE_LIST" != "" ]; then
 fi
 
 count=0
+output_file_count=0
 $find_command |
 while read nextInputFile
 do
@@ -543,6 +547,12 @@ do
 #
 # Name the files
 #
+    output_file_count=$(($output_file_count+1))
+    job_output_dir="$OUTPUT_DIR"
+    if [ "$OUTPUT_FILES_PER_SUBDIR" != "0" ]; then
+        job_output_dir="$job_output_dir/"$(($output_file_count/$OUTPUT_FILES_PER_SUBDIR+1))
+    fi
+
     rootname=`basename $firstInputFile .root`
     jobtag=$runName-$rootname
     if [ ${#jobtag} -gt 245 ]; then
@@ -578,7 +588,7 @@ do
 
     if [ "$SKIP_EXISTING_OUTPUT" = "1" ]; then
       # Check for existing output file
-      if outputFileExists $OUTPUT_DIR/$outputFileName; then
+      if outputFileExists $job_output_dir/$outputFileName; then
         continue
       fi
     fi
@@ -618,7 +628,7 @@ do
     cat >> $submitFile <<EOF
 
 InitialDir           = $jobtag
-Arguments            = $jobcfg `basename $outputFileName` $OUTPUT_DIR
+Arguments            = $jobcfg `basename $outputFileName` $job_output_dir
 Transfer_Input_Files = $inputfiles
 output               = $stdout
 error                = $stderr
