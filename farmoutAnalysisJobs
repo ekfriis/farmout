@@ -384,7 +384,7 @@ cd $runDir || die "Failed to create directory $runDir"
 Executable=`which cmsRun.sh`
 
 if [ "$QUICK_TEST" != "" ]; then
-  SITE_REQUIREMENTS="${SITE_REQUIREMENTS} && IsFastQueueSlot =?= True"
+  SITE_REQUIREMENTS="${SITE_REQUIREMENTS} && IsFastSlot =?= True"
 fi
 
 #
