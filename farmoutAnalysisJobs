@@ -127,6 +127,7 @@ PrintUsage() {
   echo ""
   echo "OPTIONS:"
   echo "  --output-dir=${SRM_HOME}/<jobName>-<runName>"
+  echo "               (the special value '.' copies files back to submit dir)"
   echo "  --input-dir=${DCAP_HOME}/<jobName>"
   echo "  --input-dbs-path=/dbs/dataset/path   (in place of --input-dir)"
   echo "  --input-runs=Run1,Run2,...           (must be used with --input-dbs-path)"
@@ -549,8 +550,10 @@ do
 #
     output_file_count=$(($output_file_count+1))
     job_output_dir="$OUTPUT_DIR"
-    if [ "$OUTPUT_FILES_PER_SUBDIR" != "0" ]; then
-        job_output_dir="$job_output_dir/"$(($output_file_count/$OUTPUT_FILES_PER_SUBDIR+1))
+    if [ "$OUTPUT_DIR" != "." ]; then
+        if [ "$OUTPUT_FILES_PER_SUBDIR" != "0" ]; then
+            job_output_dir="$job_output_dir/"$(($output_file_count/$OUTPUT_FILES_PER_SUBDIR+1))
+        fi
     fi
 
     rootname=`basename $firstInputFile .root`

@@ -110,6 +110,7 @@ PrintUsage() {
   echo ""
   echo "OPTIONS:"
   echo "  --output-dir=${SRM_HOME}/<jobName>"
+  echo "               (the special value '.' copies files back to submit dir)"
   echo "  --submit-dir=${SUBMIT_HOME}/<jobName>"
   echo "  --no-submit"
   echo "  --skip-existing-output  (do not create job if output file exists)"

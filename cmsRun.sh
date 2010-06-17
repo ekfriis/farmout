@@ -4,8 +4,15 @@
 jobcfgs=$1
 datafile=$2
 SRM_OUTPUT_DIR=$3
-SRM_OUTPUT_FILE="$SRM_OUTPUT_DIR/$datafile"
-SRM_FAILED_OUTPUT_FILE="${SRM_OUTPUT_DIR}-cmsRun-failed/${datafile}"
+if [ "$SRM_OUTPUT_DIR" = "." ]; then
+  # no SRM stage-out; files are being copied back to submit dir
+  SRM_OUTPUT_DIR=""
+fi
+if [ "$SRM_OUTPUT_DIR" != "" ]; then
+  SRM_OUTPUT_FILE="$SRM_OUTPUT_DIR/$datafile"
+  SRM_FAILED_OUTPUT_FILE="${SRM_OUTPUT_DIR}-cmsRun-failed/${datafile}"
+fi
+
 if [ "$OSG_GRID" != "" ]; then
   OSG_SETUP=$OSG_GRID/setup.sh
 else
@@ -191,12 +198,13 @@ export dboard_ExeTime=$((`date "+%s"` -  $start_time))
 
 if [ "$cmsRun_rc" != "0" ]; then
   echo "$cmsRun exited with status $cmsRun_rc"
-  if [ -f $datafile ] && [ "$SAVE_FAILED_DATAFILES" = "1" ]; then
+  if [ -f $datafile ] && [ "$SAVE_FAILED_DATAFILES" = "1" ] && [ "$SRM_OUTPUT_DIR" != "" ]; then
     if ! DoSrmcp "file://localhost/`pwd`/$datafile" "$SRM_FAILED_OUTPUT_FILE"; then
       echo "Failed to save datafile from failed run."
     fi
   fi
   rm -f $datafile
+  rm -f *.root
 
   dashboard_completion $cmsRun_rc
 
@@ -211,22 +219,28 @@ if ! [ -f $datafile ]; then
   exit $FAIL_JOB
 fi
 
-if ! DoSrmcp "file://localhost/`pwd`/$datafile" "$SRM_OUTPUT_FILE"; then
-  dashboard_completion 60307
-  exit 1
-fi
+if [ "$SRM_OUTPUT_DIR" != "" ]; then
+  if ! DoSrmcp "file://localhost/`pwd`/$datafile" "$SRM_OUTPUT_FILE"; then
+    dashboard_completion 60307
+    rm -f *.root
+    exit 1
+  fi
 
-rm $datafile
+  rm $datafile
+fi
 
 # Copy all other root files in the directory also
 
-for file in `ls -1 *.root 2>/dev/null`; do
-    if ! DoSrmcp file://localhost/`pwd`/$file $SRM_OUTPUT_DIR/$file; then
-        dashboard_completion 60307
-	exit 1
-    fi
-    rm $file
-done
+if [ "$SRM_OUTPUT_DIR" != "" ]; then
+  for file in `ls -1 *.root 2>/dev/null`; do
+      if ! DoSrmcp file://localhost/`pwd`/$file $SRM_OUTPUT_DIR/$file; then
+          dashboard_completion 60307
+          rm -f *.root
+	  exit 1
+      fi
+      rm $file
+  done
+fi
 
 dashboard_completion 0
 
