@@ -152,13 +152,14 @@ PrintUsage() {
   echo "  --accounting-group=cms_name  (username to use for fair-sharing)"
   echo "  --requires-whole-machine (job should reserve all slots on machine)"
   echo "  --fwklite                (in this case, provide script instead of config)"
-  echo "  --output-files-per-subdir=N (0 for infinite)"
+  echo "  --output-files-per-subdir=N (0 for infinite; 500 default)"
+  echo "  --job-generates-output-name (don't try to control output file name)"
   echo ""
   echo "Note that <runName> is taken from the name of the config file."
   exit 2
 }
 
-OPTS=`getopt -o "h" -l "help,output-dir:,input-dir:,submit-dir:,no-submit,job-count:,skip-existing-output,skip-existing-jobs,match-input-files:,exclude-input-files:,input-files-per-job:,disk-requirements:,memory-requirements:,input-file-list:,input-dbs-path:,input-runs:,save-failed-datafiles,save-missing-input-file-list:,assume-input-files-exist,site-requirements:,quick-test,extra-inputs:,accounting-group:,requires-whole-machine,fwklite,output-files-per-subdir:" -- "$@"`
+OPTS=`getopt -o "h" -l "help,output-dir:,input-dir:,submit-dir:,no-submit,job-count:,skip-existing-output,skip-existing-jobs,match-input-files:,exclude-input-files:,input-files-per-job:,disk-requirements:,memory-requirements:,input-file-list:,input-dbs-path:,input-runs:,save-failed-datafiles,save-missing-input-file-list:,assume-input-files-exist,site-requirements:,quick-test,extra-inputs:,accounting-group:,requires-whole-machine,fwklite,output-files-per-subdir:,job-generates-output-name" -- "$@"`
 if [ $? -ne 0 ]; then PrintUsage; fi
 
 eval set -- "$OPTS"
@@ -187,7 +188,7 @@ REQUIRES_WHOLE_MACHINE=
 FWKLITE=
 APPLICATION=cmsRun
 OUTPUT_FILES_PER_SUBDIR=0
-
+JOB_GENERATES_OUTPUT_NAME=0
 
 while [ ! -z "$1" ]
 do
@@ -219,11 +220,17 @@ do
     --requires-whole-machine) REQUIRES_WHOLE_MACHINE=1;;
     --fwklite) FWKLITE=1; APPLICATION=fwklite;;
     --output-files-per-subdir) shift; OUTPUT_FILES_PER_SUBDIR=$1;;
+    --job-generates-output-name) JOB_GENERATES_OUTPUT_NAME=1;;
     --) shift; break;;
     *) die "Unexpected option $1";;
   esac
   shift
 done
+
+if [ "$SKIP_EXISTING_OUTPUT" = "1" ] && [ "$JOB_GENERATES_OUTPUT_NAME" = "1" ];
+then
+  die "The option --job-generates-output-name conflicts with --skip-existing-output"
+fi
 
 # Check for some required utilities
 for exe in scramv1 condor_submit cmsRun.sh readlink voms-proxy-info ; do
@@ -265,7 +272,14 @@ if [ "$FWKLITE" != 1 ]; then
     die "cfg template must end in .py or .cfg"
   fi
 
-  for macro in \$inputFileNames \$outputFileName; do
+  macro='$outputFileName'
+  if [ "$JOB_GENERATES_OUTPUT_NAME" != "1" ] && ! grep -F -q $macro $configTemplate; then
+
+    die "$macro must appear on the configuration template.  Either specify --job-generates-output-name or put $macro in $configTemplate to let the output file name to be configured"
+
+  fi
+
+  for macro in \$inputFileNames; do
     if ! grep -F -q $macro $configTemplate; then
       die "$macro must appear on the configuration template.  I can't find it in $configTemplate"
     fi
@@ -424,6 +438,11 @@ if [ "$SAVE_FAILED_DATAFILES" != "" ]; then
   save_failed_datafiles_env="SAVE_FAILED_DATAFILES=1"
 fi
 
+if [ "$JOB_GENERATES_OUTPUT_NAME" = "1" ]; then
+  #cmsRun.sh checks for this in the environment
+  job_generates_output_name_env="JOB_GENERATES_OUTPUT_NAME=1"
+fi
+
 if [ "$FWKLITE" = 1 ]; then
   # The "configTemplate" in this case is actually the fwklite script.
 
@@ -453,7 +472,7 @@ X509UserProxy        = ${proxy}
 Universe             = vanilla
 Executable           = $Executable
 GetEnv               = true
-Environment          = "${dboard} ${save_failed_datafiles_env} ${fwklite_env}"
+Environment          = "${dboard} ${save_failed_datafiles_env} ${job_generates_output_name_env} ${fwklite_env}"
 Copy_To_Spool        = false
 Notification         = never
 WhenToTransferOutput = On_Exit

@@ -214,19 +214,21 @@ if [ "$cmsRun_rc" != "0" ]; then
 fi
 
 
-if ! [ -f $datafile ]; then
-  echo "$cmsRun did not produce expected datafile $datafile"
-  exit $FAIL_JOB
-fi
-
-if [ "$SRM_OUTPUT_DIR" != "" ]; then
-  if ! DoSrmcp "file://localhost/`pwd`/$datafile" "$SRM_OUTPUT_FILE"; then
-    dashboard_completion 60307
-    rm -f *.root
-    exit 1
+if [ "$JOB_GENERATES_OUTPUT_NAME" != 1 ]; then
+  if ! [ -f $datafile ]; then
+    echo "$cmsRun did not produce expected datafile $datafile"
+    exit $FAIL_JOB
   fi
 
-  rm $datafile
+  if [ "$SRM_OUTPUT_DIR" != "" ]; then
+    if ! DoSrmcp "file://localhost/`pwd`/$datafile" "$SRM_OUTPUT_FILE"; then
+      dashboard_completion 60307
+      rm -f *.root
+      exit 1
+    fi
+
+    rm $datafile
+  fi
 fi
 
 # Copy all other root files in the directory also
