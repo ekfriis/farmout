@@ -154,16 +154,18 @@ PrintUsage() {
   echo "  --fwklite                (in this case, provide script instead of config)"
   echo "  --output-files-per-subdir=N (0 for infinite; 500 default)"
   echo "  --job-generates-output-name (don't try to control output file name)"
+  echo "  --dbs-service-url=X         (global DBS by default)"
   echo ""
   echo "Note that <runName> is taken from the name of the config file."
   exit 2
 }
 
-OPTS=`getopt -o "h" -l "help,output-dir:,input-dir:,submit-dir:,no-submit,job-count:,skip-existing-output,skip-existing-jobs,match-input-files:,exclude-input-files:,input-files-per-job:,disk-requirements:,memory-requirements:,input-file-list:,input-dbs-path:,input-runs:,save-failed-datafiles,save-missing-input-file-list:,assume-input-files-exist,site-requirements:,quick-test,extra-inputs:,accounting-group:,requires-whole-machine,fwklite,output-files-per-subdir:,job-generates-output-name" -- "$@"`
+OPTS=`getopt -o "h" -l "help,output-dir:,input-dir:,submit-dir:,no-submit,job-count:,skip-existing-output,skip-existing-jobs,match-input-files:,exclude-input-files:,input-files-per-job:,disk-requirements:,memory-requirements:,input-file-list:,input-dbs-path:,input-runs:,save-failed-datafiles,save-missing-input-file-list:,assume-input-files-exist,site-requirements:,quick-test,extra-inputs:,accounting-group:,requires-whole-machine,fwklite,output-files-per-subdir:,job-generates-output-name,dbs-service-url:" -- "$@"`
 if [ $? -ne 0 ]; then PrintUsage; fi
 
 eval set -- "$OPTS"
 
+DBS_URL_ARG=
 ACCOUNTING_GROUP=
 NO_SUBMIT=
 JOB_LIMIT=
@@ -221,6 +223,7 @@ do
     --fwklite) FWKLITE=1; APPLICATION=fwklite;;
     --output-files-per-subdir) shift; OUTPUT_FILES_PER_SUBDIR=$1;;
     --job-generates-output-name) JOB_GENERATES_OUTPUT_NAME=1;;
+    --dbs-service-url) shift; DBS_URL_ARG="--url=$1";;
     --) shift; break;;
     *) die "Unexpected option $1";;
   esac
@@ -506,7 +509,7 @@ dbs_query() {
     for arg; do
       query="$query $arg"
     done
-    python $DBSCMD_HOME/dbsCommandLine.py -c search --query="$query" | grep /store/
+    python $DBSCMD_HOME/dbsCommandLine.py -c search ${DBS_URL_ARG} --query="$query" | grep /store/
 }
 if [ "$INPUT_DBS_PATH" != "" ]; then
   query="dataset=$INPUT_DBS_PATH"
