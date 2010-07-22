@@ -124,11 +124,12 @@ PrintUsage() {
   echo "  --extra-inputs=file1,file2,...  (e.g. parameter files)"
   echo "  --accounting-group=cms_name  (username to use for fair-sharing)"
   echo "  --requires-whole-machine (job should reserve all slots on machine)"
+  echo "  --output-files-per-subdir=N (0 for infinite; 500 default)"
   echo ""
   exit 2
 }
 
-OPTS=`getopt -o "h" -l "help,output-dir:,submit-dir:,no-submit,skip-existing-output,skip-existing-jobs,disk-requirements:,memory-requirements:,save-failed-datafiles,site-requirements:,quick-test,extra-inputs:,accounting-group:,requires-whole-machine" -- "$@"`
+OPTS=`getopt -o "h" -l "help,output-dir:,submit-dir:,no-submit,skip-existing-output,skip-existing-jobs,disk-requirements:,memory-requirements:,save-failed-datafiles,site-requirements:,quick-test,extra-inputs:,accounting-group:,requires-whole-machine,output-files-per-subdir:" -- "$@"`
 if [ $? -ne 0 ]; then PrintUsage; fi
 
 eval set -- "$OPTS"
@@ -144,6 +145,7 @@ CFG_EXTENSION=
 QUICK_TEST=
 EXTRA_INPUTS=
 REQUIRES_WHOLE_MACHINE=
+OUTPUT_FILES_PER_SUBDIR=500
 
 while [ ! -z "$1" ]
 do
@@ -163,6 +165,7 @@ do
     --extra-inputs) shift; EXTRA_INPUTS="$1";;
     --accounting-group) shift; ACCOUNTING_GROUP="+AccountingGroup=\"$1\"";;
     --requires-whole-machine) REQUIRES_WHOLE_MACHINE=1;;
+    --output-files-per-subdir) shift; OUTPUT_FILES_PER_SUBDIR=$1;;
     --) shift; break;;
     *) die "Unexpected option $1";;
   esac
@@ -383,6 +386,8 @@ for template in $chainedConfigs; do
   let final_step=$final_step+1
 done
 
+output_file_count=0
+
 #
 # Loop over jobs
 #
@@ -390,8 +395,15 @@ while (( $nEvents > $nEventsSubmitted )); do
 #
 # Name the files
 #
-    jobtag=$jobName-`printf "%4.4d" $job`
+    job_output_dir="$OUTPUT_DIR"
+    if [ "$OUTPUT_DIR" != "." ]; then
+        if [ "$OUTPUT_FILES_PER_SUBDIR" != "0" ]; then
+            job_output_dir="$job_output_dir/"$(($output_file_count/$OUTPUT_FILES_PER_SUBDIR+1))
+        fi
+    fi
+    output_file_count=$(($output_file_count+1))
 
+    jobtag=$jobName-`printf "%4.4d" $job`
     let job=$job+1
     if [ "$SKIP_EXISTING_JOBS" = "1" ] && [ -d $jobtag ]; then
       continue
@@ -405,7 +417,7 @@ while (( $nEvents > $nEventsSubmitted )); do
 
     if [ "$SKIP_EXISTING_OUTPUT" = "1" ]; then
       # Check for existing output file
-      if outputFileExists $OUTPUT_DIR/$outputFileName; then
+      if outputFileExists $job_output_dir/$outputFileName; then
         continue
       fi
     fi
@@ -480,7 +492,7 @@ while (( $nEvents > $nEventsSubmitted )); do
     cat <<EOF >> $submitFile
 
 InitialDir           = $jobtag
-Arguments            = $jobcfgs $outputFileName $OUTPUT_DIR
+Arguments            = $jobcfgs $outputFileName $job_output_dir
 Transfer_Input_Files = $jobinputfiles
 output               = $stdout
 error                = $stderr
