@@ -455,7 +455,8 @@ while (( $nEvents > $nEventsSubmitted )); do
     sed < $configTemplate \
       "${randomSed}
        s|\\\$nEventsPerJob|$nEventsPerJob|g;
-       s|\\\$outputFileName|$step1_outputFileName|g" > $jobtag/$jobcfg
+       s|\\\$outputFileName|$step1_outputFileName|g;
+       s|\\\$jobNumber|$(($job-1))|g" > $jobtag/$jobcfg
 
 
     jobinputfiles="$jobcfg"

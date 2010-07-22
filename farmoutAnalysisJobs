@@ -639,7 +639,8 @@ do
     if [ "$FWKLITE" != 1 ]; then
       sed < $configTemplate \
           "s|\\\$inputFileNames|$inputFileNames|g;
-           s|\\\$outputFileName|$outputFileName|g" > $jobcfg
+           s|\\\$outputFileName|$outputFileName|g;
+           s|\\\$jobNumber|$output_file_count|g" > $jobcfg
     else
       # convert quoted comma-separated inputfile list to newline-separated
       echo "$inputFileNames" | sed \
