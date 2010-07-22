@@ -570,13 +570,13 @@ do
 #
 # Name the files
 #
-    output_file_count=$(($output_file_count+1))
     job_output_dir="$OUTPUT_DIR"
     if [ "$OUTPUT_DIR" != "." ]; then
         if [ "$OUTPUT_FILES_PER_SUBDIR" != "0" ]; then
             job_output_dir="$job_output_dir/"$(($output_file_count/$OUTPUT_FILES_PER_SUBDIR+1))
         fi
     fi
+    output_file_count=$(($output_file_count+1))
 
     rootname=`basename $firstInputFile .root`
     jobtag=$runName-$rootname
