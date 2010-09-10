@@ -22,6 +22,7 @@ PrintUsage() {
   echo "  --exclude-input-files=pattern"
   echo "  --reuse-cache-files"
   echo "  --abort-on-copy-error"
+  echo "  --failed-files=file (where to write names of files that could not be copied)"
   echo "  --copy-timeout=N  (seconds)"
   echo "  --parallel=N      (number of files to copy in parallel; default 3)"
   echo "  --merge-only      (merge whatever files already exist in local cache)"
@@ -42,7 +43,7 @@ PrintUsage() {
   exit 2
 }
 
-OPTS=`getopt -o "h" -l "help,cache-dir:,match-input-files:,exclude-input-files:,reuse-cache-files,abort-on-copy-error,copy-timeout:,merge-only,use-hadd,parallel:" -- "$@"`
+OPTS=`getopt -o "h" -l "help,cache-dir:,match-input-files:,exclude-input-files:,reuse-cache-files,abort-on-copy-error,copy-timeout:,merge-only,use-hadd,parallel:,failed-files:" -- "$@"`
 if [ $? -ne 0 ]; then PrintUsage; fi
 
 eval set -- "$OPTS"
@@ -71,6 +72,7 @@ do
     --merge-only) MERGE_ONLY=1; REUSE_CACHE_FILES=1;;
     --use-hadd) USE_HADD=1;;
     --parallel) shift; PARALLEL=$1;;
+    --failed-files) shift; FAILED_FILES_ARG="--failed_files=$1";;
     --) shift; break;;
     *) echo "Unexpected option $1"; PrintUsage;;
   esac
@@ -156,7 +158,9 @@ if [ "$ABORT_ON_COPY_ERROR" = 0 ]; then
   CONTINUE_ON_ERROR_ARG=--continue_on_error
 fi
 
-dccp_many --copyjobfile=$FILE_LIST --copy_timeout=$COPY_TIMEOUT $CONTINUE_ON_ERROR_ARG --parallel=$PARALLEL
+dccp_many --copyjobfile=$FILE_LIST --copy_timeout=$COPY_TIMEOUT $CONTINUE_ON_ERROR_ARG $FAILED_FILES_ARG --parallel=$PARALLEL
+
+echo
 
 dccp_rc=$?
 
