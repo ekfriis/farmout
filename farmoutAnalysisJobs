@@ -30,7 +30,7 @@ PNFS_STORE=/pnfs/hep.wisc.edu
 SRM_HOME=${SRM_SERVER}${PNFS_HOME}
 DCAP_HOME=${DCAP_SERVER}${PNFS_HOME}
 
-SITE_REQUIREMENTS='TARGET.HasAFS_OSG =?= True && TARGET.OSRedHatRelease =!= "Scientific Linux SL Release 3.0.4 (SL)" && IsSlowSlot=!=true'
+SITE_REQUIREMENTS='TARGET.Arch == "X86_64" && TARGET.HasAFS_OSG =?= True && TARGET.OSRedHatRelease =!= "Scientific Linux SL Release 3.0.4 (SL)" && IsSlowSlot=!=true'
 DISK_REQUIREMENTS=2000
 MEMORY_REQUIREMENTS=900
 HOLD_IMAGE_SIZE_FACTOR=4.0
@@ -483,13 +483,18 @@ on_exit_remove       = (ExitBySignal == FALSE && (ExitCode == 0 || (ExitCode == 
 +IsFastQueueJob      = True
 ImageSize            = $(($MEMORY_REQUIREMENTS*1024))
 +DiskUsage           = $(($DISK_REQUIREMENTS*1024))
-Requirements         = ${SITE_REQUIREMENTS}
+Requirements         = ${SITE_REQUIREMENTS} && TARGET.Memory > ${MEMORY_REQUIREMENTS}
 # stop jobs from running if they blow up
-periodic_hold        = ImageSize/1024 > ${HOLD_IMAGE_SIZE_FACTOR}*${MEMORY_REQUIREMENTS} || DiskUsage/1024 > ${HOLD_DISK_USAGE_FACTOR}*${DISK_REQUIREMENTS}
+periodic_hold        = DiskUsage/1024 > ${HOLD_DISK_USAGE_FACTOR}*${DISK_REQUIREMENTS}
 ${ACCOUNTING_GROUP}
 ${REQUIRES_WHOLE_MACHINE_ATTR}
 EOF
 
+# The following periodic hold expression caused jobs to get put on hold
+# when condor happened to monitor the image size when the srm client
+# was running, because the new version of the 64-bit jvm has a default
+# 4GB heap size.
+#ImageSize/1024 > ${HOLD_IMAGE_SIZE_FACTOR}*${MEMORY_REQUIREMENTS}
 
 echo "Generating submit files in $runDir..."
 
