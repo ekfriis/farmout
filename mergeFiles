@@ -27,6 +27,7 @@ PrintUsage() {
   echo "  --parallel=N      (number of files to copy in parallel; default 3)"
   echo "  --merge-only      (merge whatever files already exist in local cache)"
   echo "  --use-hadd        (use the root 'hadd' program to do the merge)"
+  echo "  --crab-unique     (filter out duplicate output files)"
   echo ""
   echo "Note that <mergeName> is taken from the name of the output file."
   echo
@@ -43,7 +44,7 @@ PrintUsage() {
   exit 2
 }
 
-OPTS=`getopt -o "h" -l "help,cache-dir:,match-input-files:,exclude-input-files:,reuse-cache-files,abort-on-copy-error,copy-timeout:,merge-only,use-hadd,parallel:,failed-files:" -- "$@"`
+OPTS=`getopt -o "h" -l "help,cache-dir:,match-input-files:,exclude-input-files:,reuse-cache-files,abort-on-copy-error,copy-timeout:,merge-only,use-hadd,parallel:,failed-files:,crab-unique" -- "$@"`
 if [ $? -ne 0 ]; then PrintUsage; fi
 
 eval set -- "$OPTS"
@@ -57,6 +58,7 @@ COPY_TIMEOUT=0
 MERGE_ONLY=0
 USE_HADD=0
 PARALLEL=3
+CRAB_UNIQUE=0
 
 while [ ! -z "$1" ]
 do
@@ -73,6 +75,7 @@ do
     --use-hadd) USE_HADD=1;;
     --parallel) shift; PARALLEL=$1;;
     --failed-files) shift; FAILED_FILES_ARG="--failed_files=$1";;
+    --crab-unique) CRAB_UNIQUE=1;;
     --) shift; break;;
     *) echo "Unexpected option $1"; PrintUsage;;
   esac
@@ -152,6 +155,32 @@ done
 if [ "$?" -ne 0 ]; then
   rm -f $FILE_LIST
   exit 1
+fi
+
+if [ "$CRAB_UNIQUE" = "1" ]; then
+  if ! which listUniqueCrabFiles > /dev/null; then
+    echo "Did not find listUniqueCrabFiles in PATH, so cannot filter redundant CRAB files."
+    exit 1
+  fi
+
+  rm -f $FILE_LIST.crab
+  for dir; do
+    listUniqueCrabFiles $dir >> $FILE_LIST.crab \
+      || die "Failed to run listUniqueCrabFiles $dir"
+  done
+
+  grep -F -f $FILE_LIST.crab $FILE_LIST > $FILE_LIST.crab.filtered
+
+  lines_before=`awk 'BEGIN{LINES=0}{LINES++}END{print LINES}' $FILE_LIST`
+  lines_after=`awk 'BEGIN{LINES=0}{LINES++}END{print LINES}' $FILE_LIST.crab.filtered`
+  lines_removed=$(($lines_before-$lines_after))
+
+  if [ "$lines_removed" -gt 0 ]; then
+    echo "Filtered out $lines_removed redundant CRAB output files."
+  fi
+
+  mv $FILE_LIST.crab.filtered $FILE_LIST
+  rm -f $FILE_LIST.crab
 fi
 
 if [ "$ABORT_ON_COPY_ERROR" = 0 ]; then
