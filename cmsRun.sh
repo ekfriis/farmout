@@ -41,45 +41,41 @@ dashboard_completion() {
 }
 
 outputFileExists() {
-  srm_fname="$1"
+  local srm_fname="$1"
 
-  info="`srm-get-metadata -retry_num=0 $srm_fname 2>/dev/null`"
-  if [ "$?" != "0" ]; then
-    return 1
-  fi
-  size_line="`echo \"$info\" | grep \"size :\"`"
+  local info="`srmls -retry_num=0 $srm_fname 2>/dev/null`"
   if [ "$?" != "0" ]; then
     return 1
   fi
   IFS=$' :\t'
-  size="`echo \"$size_line\" | ( read label size; echo $size )`"
+  local size="`echo \"$info\" | ( read size name; echo $size )`"
   unset IFS
   if [ "$size" != "0" ] && [ "$size" != "" ]; then
     return 0
   fi
   if [ "$size" = "0" ]; then
     echo "Cleaning up zero-length destination file $srm_fname."
-    srm-advisory-delete -debug=true -retry_num=0 "$srm_fname"
+    srmrm -debug=true -retry_num=0 "$srm_fname"
   fi
   return 1
 }
 
 RunWithTimeout() {
-    timeout=$1
+    local timeout=$1
     shift
 
     "$@" &
     PID=$!
 
-    start=`date "+%s"`
-    soft_timeout_time=$(($start + $timeout))
-    hard_timeout_time=$(($start + $timeout + 60))
+    local start=`date "+%s"`
+    local soft_timeout_time=$(($start + $timeout))
+    local hard_timeout_time=$(($start + $timeout + 60))
     while [ 1 ]; do
         if ! kill -0 $PID >& /dev/null; then
             wait $PID
             return
         fi
-        now=`date "+%s"`
+        local now=`date "+%s"`
         if [ $now -gt $hard_timeout_time ]; then
             echo "Hard killing pid $PID." 2>&1
             kill -9 $PID
@@ -92,22 +88,63 @@ RunWithTimeout() {
     done
 }
 
+# create a directory and any missing parent directories
+DoSrmMkdir() {
+    local dest="$1"
+    if srmmkdir -debug=true -retry_num=0 ${dest}; then
+        echo "Creation of ${dest} succeeded."
+        return 0
+    fi
+
+    local parent_dir=`dirname ${dest}`
+
+    # Test to see if parent dir looks like a valid SRM path.
+    # If not, we have probably stepped too far back into the URL.
+
+    if [ "$parent_dir" = "$dest" ]; then
+        return 1
+    fi
+
+    if ( echo $dest | grep -q ':[0-9]' ) && ! ( echo $parent_dir | grep -q ':[0-9]' ); then
+        # the ":port" specification has been eaten by dirname, so
+	# we have gone too far
+        return 1
+    fi
+
+    if ( echo $dest | grep -q 'SFN=' ) && ! ( echo $parent_dir | grep -q 'SFN=' ); then
+        # the "SFN=" specification has been eaten by dirname, so
+	# we have gone too far
+        return 1
+    fi
+
+    echo "Attempting to create parent directory ${parent_dir}, in case that is the problem."
+    if DoSrmMkdir ${parent_dir}; then
+        echo "Creation of parent directory succeeded.  Now try creating ${dest} again."
+        if srmmkdir -debug=true -retry_num=0 ${dest}; then
+            echo "Creation of ${dest} succeeded."
+            return 0
+        fi
+    fi
+
+    return 1
+}
+
 DoSrmcp() {
-    src="$1"
-    dest="$2"
+    local src="$1"
+    local dest="$2"
 
     # The internal retries in srmcp are often useless, because a broken file
     # may be left behind (as of dCache 1.7.0-38), so further attempts to
     # copy the file will all fail with the error "file exists".  Therefore,
     # we have our own retry loop, including deletion of broken files.
 
-    tries=0
+    local tries=0
     while [ "$tries" -lt 3 ]; do
       if [ "$tries" -gt 1 ]; then
         echo "Trying again at `date`: srmcp $src $dest"
       fi
 
-      RunWithTimeout $SRM_TIMEOUT srmcp -debug=true -retry_num=0 "$src" "$dest"
+      RunWithTimeout $SRM_TIMEOUT srmcp -2 -debug=true -retry_num=0 "$src" "$dest"
       rc=$?
 
       if [ "$rc" = "0" ]; then
@@ -122,12 +159,15 @@ DoSrmcp() {
 
       if outputFileExists "$dest"; then
          echo "Cleaning up failed destination file $dest."
-         srm-advisory-delete -debug=true -retry_num=0 "$dest"
+         srmrm -debug=true -retry_num=0 "$dest"
 
          rc=$?
          if [ "$rc" != "0" ]; then
-           echo "srm-advisory-delete failed with exit status $rc at `date`."
+           echo "srmrm failed with exit status $rc at `date`."
          fi
+      else
+         echo "Attempting to create target directories in case that is the problem."
+         DoSrmMkdir `dirname $dest`
       fi
 
       tries=$(($tries+1))

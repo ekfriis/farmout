@@ -110,7 +110,7 @@ PrintUsage() {
   echo ""
   echo "OPTIONS:"
   echo "  --output-dir=${SRM_HOME}/<jobName>"
-  echo "               (the special value '.' copies files back to submit dir)"
+  echo "               (--output-dir=. copies files back to submit dir)"
   echo "  --submit-dir=${SUBMIT_HOME}/<jobName>"
   echo "  --no-submit"
   echo "  --skip-existing-output  (do not create job if output file exists)"
@@ -125,11 +125,12 @@ PrintUsage() {
   echo "  --accounting-group=cms_name  (username to use for fair-sharing)"
   echo "  --requires-whole-machine (job should reserve all slots on machine)"
   echo "  --output-files-per-subdir=N (0 for infinite; 500 default)"
+  echo "  --use-hdfs                  (write to /hdfs)"
   echo ""
   exit 2
 }
 
-OPTS=`getopt -o "h" -l "help,output-dir:,submit-dir:,no-submit,skip-existing-output,skip-existing-jobs,disk-requirements:,memory-requirements:,save-failed-datafiles,site-requirements:,quick-test,extra-inputs:,accounting-group:,requires-whole-machine,output-files-per-subdir:" -- "$@"`
+OPTS=`getopt -o "h" -l "help,output-dir:,submit-dir:,no-submit,skip-existing-output,skip-existing-jobs,disk-requirements:,memory-requirements:,save-failed-datafiles,site-requirements:,quick-test,extra-inputs:,accounting-group:,requires-whole-machine,output-files-per-subdir:,use-hdfs" -- "$@"`
 if [ $? -ne 0 ]; then PrintUsage; fi
 
 eval set -- "$OPTS"
@@ -166,6 +167,11 @@ do
     --accounting-group) shift; ACCOUNTING_GROUP="+AccountingGroup=\"$1\"";;
     --requires-whole-machine) REQUIRES_WHOLE_MACHINE=1;;
     --output-files-per-subdir) shift; OUTPUT_FILES_PER_SUBDIR=$1;;
+    --use-hdfs)
+        SRM_SERVER=srm://cmshdfs01.hep.wisc.edu:8443/srm/v2/server?SFN=
+        PNFS_HOME=/hdfs/store/user/$USER
+        SRM_HOME=${SRM_SERVER}${PNFS_HOME}
+        ;;
     --) shift; break;;
     *) die "Unexpected option $1";;
   esac
