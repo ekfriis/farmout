@@ -188,10 +188,9 @@ if [ "$ABORT_ON_COPY_ERROR" = 0 ]; then
 fi
 
 dccp_many --copyjobfile=$FILE_LIST --copy_timeout=$COPY_TIMEOUT $CONTINUE_ON_ERROR_ARG $FAILED_FILES_ARG --parallel=$PARALLEL
+dccp_rc=$?
 
 echo
-
-dccp_rc=$?
 
 rm -f $FILE_LIST
 
