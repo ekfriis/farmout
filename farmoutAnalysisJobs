@@ -331,13 +331,17 @@ LOCAL_INPUT_DIR=${INPUT_DIR#$DCAP_SERVER}
 #Get the part of INPUT_DIR that was stripped off.
 INPUT_BASE=${INPUT_DIR%$LOCAL_INPUT_DIR}
 
+if [ -d "${LOCAL_POSIX_PREFIX}${LOCAL_INPUT_DIR}" ]; then
+    LOCAL_INPUT_DIR="${LOCAL_POSIX_PREFIX}${LOCAL_INPUT_DIR}"
+fi
+
 if [ "$INPUT_FILE_LIST" != "" ]; then
     if ! [ -f "$INPUT_FILE_LIST" ]; then
         die "Error: No such file: $INPUT_FILE_LIST"
     fi
     INPUT_FILE_LIST=`realpath $INPUT_FILE_LIST`
-elif ! [ -d "${LOCAL_POSIX_PREFIX}${LOCAL_INPUT_DIR}" ]; then
-  die "Error: No such input directory: ${LOCAL_POSIX_PREFIX}${LOCAL_INPUT_DIR}"
+elif ! [ -d "${LOCAL_INPUT_DIR}" ]; then
+  die "Error: No such input directory: ${LOCAL_INPUT_DIR}"
 fi
 
 if [ "$INPUT_DBS_PATH" != "" ]; then
@@ -530,7 +534,7 @@ if [ "$EXCLUDE_INPUT_FILES" != "" ]; then
   EXCLUDE_ARG="-not -name $EXCLUDE_INPUT_FILES"
 fi
 
-find_command="find ${LOCAL_POSIX_PREFIX}${LOCAL_INPUT_DIR} -size +0 -name $MATCH_INPUT_FILES $EXCLUDE_ARG"
+find_command="find ${LOCAL_INPUT_DIR} -size +0 -name $MATCH_INPUT_FILES $EXCLUDE_ARG"
 
 dbs_query() {
     query="find file where"
@@ -568,7 +572,7 @@ do
         if [ "$prepend_local_input_dir" = 1 ]; then
             nextInputFile="${LOCAL_INPUT_DIR}${nextInputFile}"
         fi
-        nextInputFilePosix="${LOCAL_POSIX_PREFIX}${nextInputFile}"
+        nextInputFilePosix="${nextInputFile}"
 
         if [ "$check_input_file_existence" = "1" ]; then
             if ! [ -f "$nextInputFilePosix" ]; then
