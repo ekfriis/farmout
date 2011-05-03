@@ -19,13 +19,17 @@
 # Initialize default settings:
 
 # for storing output
-SRM_SERVER=srm://cmssrm.hep.wisc.edu:8443/srm/managerv2?SFN=
-PNFS_HOME=/pnfs/hep.wisc.edu/store/user/$USER
+FARMOUT_USER=${FARMOUT_USER:-${USER}}
+SRM_SERVER=srm://cmssrm.hep.wisc.edu:8443/srm/v2/server?SFN=/hdfs
+PNFS_HOME=/store/user/${FARMOUT_USER}
+
+LOCAL_POSIX_PREFIX=/hdfs
 
 # for getting input
-DCAP_SERVER=dcap://cmsdcap.hep.wisc.edu:22125
+DCAP_SERVER=root://cmsxrootd.hep.wisc.edu/
+
 # path to directory containing lfns: /store/...
-PNFS_STORE=/pnfs/hep.wisc.edu
+PNFS_STORE=
 
 SRM_HOME=${SRM_SERVER}${PNFS_HOME}
 DCAP_HOME=${DCAP_SERVER}${PNFS_HOME}
@@ -49,7 +53,7 @@ for scratch_dir in /data /scratch /tmp; do
     break
   fi
 done
-SUBMIT_HOME=${scratch_dir}/$USER
+SUBMIT_HOME=${scratch_dir}/${FARMOUT_USER}
 
 basename() {
   # This shell function is faster than calling /bin/basename
@@ -84,7 +88,7 @@ die() {
 outputFileExists() {
   fname=$1
 
-  #Strip off srm://hostname:8443 to get raw pnfs path.
+  #Strip off srm://hostname:8443 to get raw path.
   local_fname=${fname#srm://*:8443}
 
   #Strip off '/blah/blah?SFN='
@@ -158,14 +162,12 @@ PrintUsage() {
   echo "  --output-files-per-subdir=N (0 for infinite; 500 default)"
   echo "  --job-generates-output-name (don't try to control output file name)"
   echo "  --dbs-service-url=X         (global DBS by default)"
-  echo "  --use-hdfs                  (read/write to /hdfs)"
-  echo "  --use-xrootd-hdfs           (read/write to /hdfs via xrootd)"
   echo ""
   echo "Note that <runName> is taken from the name of the config file."
   exit 2
 }
 
-OPTS=`getopt -o "h" -l "help,output-dir:,input-dir:,submit-dir:,no-submit,job-count:,skip-existing-output,skip-existing-jobs,match-input-files:,exclude-input-files:,input-files-per-job:,disk-requirements:,memory-requirements:,input-file-list:,input-dbs-path:,input-runs:,save-failed-datafiles,save-missing-input-file-list:,assume-input-files-exist,site-requirements:,quick-test,extra-inputs:,accounting-group:,requires-whole-machine,fwklite,output-files-per-subdir:,job-generates-output-name,dbs-service-url:,use-hdfs,use-xrootd-hdfs" -- "$@"`
+OPTS=`getopt -o "h" -l "help,output-dir:,input-dir:,submit-dir:,no-submit,job-count:,skip-existing-output,skip-existing-jobs,match-input-files:,exclude-input-files:,input-files-per-job:,disk-requirements:,memory-requirements:,input-file-list:,input-dbs-path:,input-runs:,save-failed-datafiles,save-missing-input-file-list:,assume-input-files-exist,site-requirements:,quick-test,extra-inputs:,accounting-group:,requires-whole-machine,fwklite,output-files-per-subdir:,job-generates-output-name,dbs-service-url:" -- "$@"`
 if [ $? -ne 0 ]; then PrintUsage; fi
 
 eval set -- "$OPTS"
@@ -229,31 +231,22 @@ do
     --output-files-per-subdir) shift; OUTPUT_FILES_PER_SUBDIR=$1;;
     --job-generates-output-name) JOB_GENERATES_OUTPUT_NAME=1;;
     --dbs-service-url) shift; DBS_URL_ARG="--url=$1";;
-    --use-hdfs)
-        SRM_SERVER=srm://cmshdfs01.hep.wisc.edu:8443/srm/v2/server?SFN=
-        PNFS_HOME=/hdfs/store/user/$USER
-        DCAP_SERVER=
-        PNFS_STORE=/hdfs
-        SRM_HOME=${SRM_SERVER}${PNFS_HOME}
-        DCAP_HOME=${DCAP_SERVER}${PNFS_HOME}
-
-	# The following is required for CMSSW < 6.9.0, because
-	# we rely on fallback to xrootd when /hdfs is not there,
-	# and support for fallback was added in 6.9.0.
-	# TODO: check what version of CMSSW is being used and only
-	# apply this when needed.  Also, find a better way of testing
-	# for /hdfs.
-	SITE_REQUIREMENTS="${SITE_REQUIREMENTS} && TARGET.UidDomain == \"hep.wisc.edu\""
-        ;;
-    --use-xrootd-hdfs)
-        SRM_SERVER=srm://cmshdfs01.hep.wisc.edu:8443/srm/v2/server?SFN=/hdfs
-        PNFS_HOME=/store/user/$USER
-        LOCAL_POSIX_PREFIX=/hdfs
-        DCAP_SERVER=root://cmshdfs01.hep.wisc.edu/
-        PNFS_STORE=
-        SRM_HOME=${SRM_SERVER}${PNFS_HOME}
-        DCAP_HOME=${DCAP_SERVER}${PNFS_HOME}
-        ;;
+#    --use-hdfs)
+#        SRM_SERVER=srm://cmshdfs01.hep.wisc.edu:8443/srm/v2/server?SFN=
+#        PNFS_HOME=/hdfs/store/user/${FARMOUT_USER}
+#        DCAP_SERVER=
+#        PNFS_STORE=/hdfs
+#        SRM_HOME=${SRM_SERVER}${PNFS_HOME}
+#        DCAP_HOME=${DCAP_SERVER}${PNFS_HOME}
+#
+#	# The following is required for CMSSW < 6.9.0, because
+#	# we rely on fallback to xrootd when /hdfs is not there,
+#	# and support for fallback was added in 6.9.0.
+#	# TODO: check what version of CMSSW is being used and only
+#	# apply this when needed.  Also, find a better way of testing
+#	# for /hdfs.
+#	SITE_REQUIREMENTS="${SITE_REQUIREMENTS} && TARGET.UidDomain == \"hep.wisc.edu\""
+#        ;;
     --) shift; break;;
     *) die "Unexpected option $1";;
   esac
@@ -448,7 +441,7 @@ if [ "$INPUT_DBS_PATH" != "" ]; then
     dboard_datasetFull="dboard_datasetFull=${INPUT_DBS_PATH}"
 fi
 dboard="
-dboard_taskId=${USER}-`hostname -f`-\$(Cluster)
+dboard_taskId=${FARMOUT_USER}-`hostname -f`-\$(Cluster)
 dboard_jobId=\$(Process)
 dboard_sid=\$\$([GlobalJobId])
 ${dboard_datasetFull}
@@ -458,7 +451,7 @@ dboard_tool=farmout
 dboard_scheduler=local-condor
 dboard_taskType=analysis
 dboard_broker=local-condor-`hostname -f`
-dboard_user=${USER}
+dboard_user=${FARMOUT_USER}
 dboard_SyncCE=${CMS_DASHBOARD_LOCAL_CE}
 CMS_DASHBOARD_REPORTER=${CMS_DASHBOARD_REPORTER}
 FARMOUT_DASHBOARD_REPORTER=${FARMOUT_DASHBOARD_REPORTER}

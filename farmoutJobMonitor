@@ -13,7 +13,8 @@
 # Variables
 #
 # location to store the log file of jobs running
-logFile="/afs/hep.wisc.edu/home/$USER/jobMonitor.log"
+FARMOUT_USER=${FARMOUT_USER:-${USER}}
+logFile="/afs/hep.wisc.edu/home/${FARMOUT_USER}/jobMonitor.log"
 
 # max length of time to run this monitor (in minutes)
 # BUT KNOW: the monitor will stop when jobs on queue = 0
@@ -58,8 +59,8 @@ fi
 
 ##################################################
 # Set up user's web directory (public_html)
-publichtmlDir="/afs/hep.wisc.edu/home/$USER/public_html"
-wwwDir="/afs/hep.wisc.edu/home/$USER/www"
+publichtmlDir="/afs/hep.wisc.edu/home/${FARMOUT_USER}/public_html"
+wwwDir="/afs/hep.wisc.edu/home/${FARMOUT_USER}/www"
 
 # Do they have a public_html?
 if [[ ! -d "$publichtmlDir" ]]; then
@@ -89,7 +90,7 @@ for ((i=0;i<=$maxTimeToMonitor;i+=1)); do
   # Update the log file containing jobs running, etc...
   # This will look something like: 
   #   "10 jobs; 1 idle, 8 running, 1 held"
-  jobString="`condor_q $USER | tail -1`"
+  jobString="`condor_q ${FARMOUT_USER} | tail -1`"
   totalJobs=`echo $jobString | awk '{print $1}'`
   # This writes a string to the log file that looks like
   #   <month>-<day>-<hour>:<min> <total> <idle> <running> <held>
@@ -102,7 +103,7 @@ for ((i=0;i<=$maxTimeToMonitor;i+=1)); do
     /cms/cmsprod/bin/updateJobMonitorGraph.pl
     # Copy the user's job plot
     if [ -n "$imageCopyDir" ] ; then
-      cp /afs/hep.wisc.edu/home/$USER/public_html/jobMonitor.png $imageCopyDir/$USER.png
+      cp /afs/hep.wisc.edu/home/${FARMOUT_USER}/public_html/jobMonitor.png $imageCopyDir/${FARMOUT_USER}.png
     fi
 
     # If there are no jobs left, quit

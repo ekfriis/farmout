@@ -13,8 +13,9 @@
 # Sept 07, 2007
 
 ##################################################
-farmoutDir="/scratch/$USER"
-dCacheDir="/pnfs/hep.wisc.edu/store/user/$USER"
+FARMOUT_USER=${FARMOUT_USER:-${USER}}
+farmoutDir="/scratch/${FARMOUT_USER}"
+dCacheDir="/pnfs/hep.wisc.edu/store/user/${FARMOUT_USER}"
 ##################################################
 
 
@@ -164,7 +165,7 @@ listAllJobs() {
 ##################################################
 listCondorJobs() {
  echo "Currently on condor:"
- echo `condor_q "$USER" 2> /dev/null | tail -1`
+ echo `condor_q "${FARMOUT_USER}" 2> /dev/null | tail -1`
  echo
 }
 ##################################################

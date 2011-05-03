@@ -19,8 +19,8 @@
 # Initialize default settings:
 
 # for storing output
-SRM_SERVER=srm://cmssrm.hep.wisc.edu:8443
-PNFS_HOME=/pnfs/hep.wisc.edu/store/user/$USER
+SRM_SERVER=srm://cmssrm.hep.wisc.edu:8443/srm/v2/server?SFN=/hdfs
+PNFS_HOME=/store/user/$USER
 
 SRM_HOME=${SRM_SERVER}${PNFS_HOME}
 
@@ -60,8 +60,11 @@ die() {
 outputFileExists() {
   fname=$1
 
-  #Strip off srm://hostname:8443 to get raw pnfs path.
+  #Strip off srm://hostname:8443 to get raw path.
   local_fname=${fname#srm://*:8443}
+
+  #Strip off '/blah/blah?SFN='
+  local_fname=${local_fname#*SFN=}
 
   if [ -f "$local_fname" ]; then
     return 0
@@ -125,12 +128,11 @@ PrintUsage() {
   echo "  --accounting-group=cms_name  (username to use for fair-sharing)"
   echo "  --requires-whole-machine (job should reserve all slots on machine)"
   echo "  --output-files-per-subdir=N (0 for infinite; 500 default)"
-  echo "  --use-hdfs                  (write to /hdfs)"
   echo ""
   exit 2
 }
 
-OPTS=`getopt -o "h" -l "help,output-dir:,submit-dir:,no-submit,skip-existing-output,skip-existing-jobs,disk-requirements:,memory-requirements:,save-failed-datafiles,site-requirements:,quick-test,extra-inputs:,accounting-group:,requires-whole-machine,output-files-per-subdir:,use-hdfs" -- "$@"`
+OPTS=`getopt -o "h" -l "help,output-dir:,submit-dir:,no-submit,skip-existing-output,skip-existing-jobs,disk-requirements:,memory-requirements:,save-failed-datafiles,site-requirements:,quick-test,extra-inputs:,accounting-group:,requires-whole-machine,output-files-per-subdir:" -- "$@"`
 if [ $? -ne 0 ]; then PrintUsage; fi
 
 eval set -- "$OPTS"
@@ -167,11 +169,6 @@ do
     --accounting-group) shift; ACCOUNTING_GROUP="+AccountingGroup=\"$1\"";;
     --requires-whole-machine) REQUIRES_WHOLE_MACHINE=1;;
     --output-files-per-subdir) shift; OUTPUT_FILES_PER_SUBDIR=$1;;
-    --use-hdfs)
-        SRM_SERVER=srm://cmshdfs01.hep.wisc.edu:8443/srm/v2/server?SFN=
-        PNFS_HOME=/hdfs/store/user/$USER
-        SRM_HOME=${SRM_SERVER}${PNFS_HOME}
-        ;;
     --) shift; break;;
     *) die "Unexpected option $1";;
   esac
