@@ -15,7 +15,7 @@
 ##################################################
 FARMOUT_USER=${FARMOUT_USER:-${USER}}
 farmoutDir="/scratch/${FARMOUT_USER}"
-dCacheDir="/pnfs/hep.wisc.edu/store/user/${FARMOUT_USER}"
+dCacheDir="/hdfs/store/user/${FARMOUT_USER}"
 ##################################################
 
 
