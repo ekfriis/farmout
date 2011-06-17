@@ -196,6 +196,17 @@ echo "Current working directory: `pwd`"
 echo "df `pwd`"
 df .
 
+# set vsize limit here, after file checks, so this does not
+# interfere with grid tools
+echo
+if [ "$FARMOUT_VSIZE_LIMIT" != "" ]; then
+  echo "Setting virtual memory limit to $FARMOUT_VSIZE_LIMIT Mb."
+  ulimit -S -v $(( $FARMOUT_VSIZE_LIMIT * 1024 )) 2>&1
+fi
+
+ulimit -a
+echo
+
 start_time=`date "+%s"`
 
 cmsRun=cmsRun
@@ -235,6 +246,9 @@ for cfg in ${jobcfgs//,/ }; do
 done
 
 export dboard_ExeTime=$((`date "+%s"` -  $start_time))
+
+# remove vsize limit so it does not interfere with file transfer
+ulimit -S -v unlimited 2>&1
 
 if [ "$cmsRun_rc" != "0" ]; then
   echo "$cmsRun exited with status $cmsRun_rc"

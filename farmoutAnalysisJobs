@@ -37,6 +37,7 @@ DCAP_HOME=${DCAP_SERVER}${PNFS_HOME}
 SITE_REQUIREMENTS='TARGET.Arch == "X86_64" && TARGET.HasAFS_OSG =?= True && TARGET.OSRedHatRelease =!= "Scientific Linux SL Release 3.0.4 (SL)" && IsSlowSlot=!=true'
 DISK_REQUIREMENTS=2000
 MEMORY_REQUIREMENTS=900
+VSIZE_LIMIT=3000
 HOLD_IMAGE_SIZE_FACTOR=4.0
 HOLD_DISK_USAGE_FACTOR=10.0
 MIN_PROXY_HOURS=24
@@ -148,6 +149,7 @@ PrintUsage() {
   echo "  --exclude-input-files=pattern"
   echo "  --input-file-list=file"
   echo "  --memory-requirements=$MEMORY_REQUIREMENTS (megabytes)"
+  echo "  --vsize-limit=$VSIZE_LIMIT (megabytes)"
   echo "  --disk-requirements=$DISK_REQUIREMENTS   (megabytes)"
   echo "  --site-requirements=$SITE_REQUIREMENTS"
   echo "  --save-failed-datafiles  (save root file from failed cmsRun job)"
@@ -167,7 +169,7 @@ PrintUsage() {
   exit 2
 }
 
-OPTS=`getopt -o "h" -l "help,output-dir:,input-dir:,submit-dir:,no-submit,job-count:,skip-existing-output,skip-existing-jobs,match-input-files:,exclude-input-files:,input-files-per-job:,disk-requirements:,memory-requirements:,input-file-list:,input-dbs-path:,input-runs:,save-failed-datafiles,save-missing-input-file-list:,assume-input-files-exist,site-requirements:,quick-test,extra-inputs:,accounting-group:,requires-whole-machine,fwklite,output-files-per-subdir:,job-generates-output-name,dbs-service-url:,express-queue" -- "$@"`
+OPTS=`getopt -o "h" -l "help,output-dir:,input-dir:,submit-dir:,no-submit,job-count:,skip-existing-output,skip-existing-jobs,match-input-files:,exclude-input-files:,input-files-per-job:,disk-requirements:,memory-requirements:,input-file-list:,input-dbs-path:,input-runs:,save-failed-datafiles,save-missing-input-file-list:,assume-input-files-exist,site-requirements:,quick-test,extra-inputs:,accounting-group:,requires-whole-machine,fwklite,output-files-per-subdir:,job-generates-output-name,dbs-service-url:,express-queue,vsize-limit:" -- "$@"`
 if [ $? -ne 0 ]; then PrintUsage; fi
 
 eval set -- "$OPTS"
@@ -217,6 +219,7 @@ do
     --input-files-per-job) shift; INPUT_FILES_PER_JOB=$1;;
     --disk-requirements) shift; DISK_REQUIREMENTS=$1;;
     --memory-requirements) shift; MEMORY_REQUIREMENTS=$1;;
+    --vsize-limit) shift; VSIZE_LIMIT=$1;;
     --input-file-list) shift; INPUT_FILE_LIST=$1;;
     --input-dbs-path) shift; INPUT_DBS_PATH=$1;;
     --input-runs) shift; INPUT_RUNS=$1;;
@@ -499,6 +502,15 @@ if [ "$FWKLITE" = 1 ]; then
   EXTRA_INPUTS="${EXTRA_INPUTS}${configTemplate}"
 fi
 
+if [ "$VSIZE_LIMIT" != "" ]; then
+  vsize_env="FARMOUT_VSIZE_LIMIT=${VSIZE_LIMIT}"
+  if [ "$VSIZE_LIMIT" -lt "$MEMORY_REQUIREMENTS" ]; then
+    echo
+    echo "WARNING: --vsize-limit=$VSIZE_LIMIT is smaller than --memory-requirements=$MEMORY_REQUIREMENTS"
+    echo
+  fi
+fi
+
 if [ "$REQUIRES_WHOLE_MACHINE" == "1" ]; then
   REQUIRES_WHOLE_MACHINE_ATTR="+RequiresWholeMachine=true"
 
@@ -514,7 +526,7 @@ X509UserProxy        = ${proxy}
 Universe             = vanilla
 Executable           = $Executable
 GetEnv               = true
-Environment          = "${dboard} ${save_failed_datafiles_env} ${job_generates_output_name_env} ${fwklite_env}"
+Environment          = "${dboard} ${save_failed_datafiles_env} ${job_generates_output_name_env} ${fwklite_env} ${vsize_env}"
 Copy_To_Spool        = false
 Notification         = never
 WhenToTransferOutput = On_Exit

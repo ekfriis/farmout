@@ -27,6 +27,7 @@ SRM_HOME=${SRM_SERVER}${PNFS_HOME}
 SITE_REQUIREMENTS='TARGET.Arch == "X86_64" && TARGET.HasAFS_OSG =?= True && TARGET.OSRedHatRelease =!= "Scientific Linux SL Release 3.0.4 (SL)"'
 DISK_REQUIREMENTS=2000
 MEMORY_REQUIREMENTS=900
+VSIZE_LIMIT=3000
 HOLD_IMAGE_SIZE_FACTOR=4.0
 HOLD_DISK_USAGE_FACTOR=10.0
 MIN_PROXY_HOURS=24
@@ -119,6 +120,7 @@ PrintUsage() {
   echo "  --skip-existing-output  (do not create job if output file exists)"
   echo "  --skip-existing-jobs    (do not create job if already created)"
   echo "  --memory-requirements=$MEMORY_REQUIREMENTS (megabytes)"
+  echo "  --vsize-limit=$VSIZE_LIMIT (megabytes)"
   echo "  --disk-requirements=$DISK_REQUIREMENTS  (megabytes)"
   echo "  --site-requirements=$SITE_REQUIREMENTS"
   echo "  --save-failed-datafiles  (save root file from failed cmsRun job)"
@@ -132,7 +134,7 @@ PrintUsage() {
   exit 2
 }
 
-OPTS=`getopt -o "h" -l "help,output-dir:,submit-dir:,no-submit,skip-existing-output,skip-existing-jobs,disk-requirements:,memory-requirements:,save-failed-datafiles,site-requirements:,quick-test,extra-inputs:,accounting-group:,requires-whole-machine,output-files-per-subdir:" -- "$@"`
+OPTS=`getopt -o "h" -l "help,output-dir:,submit-dir:,no-submit,skip-existing-output,skip-existing-jobs,disk-requirements:,memory-requirements:,save-failed-datafiles,site-requirements:,quick-test,extra-inputs:,accounting-group:,requires-whole-machine,output-files-per-subdir:,vsize-limit:" -- "$@"`
 if [ $? -ne 0 ]; then PrintUsage; fi
 
 eval set -- "$OPTS"
@@ -162,6 +164,7 @@ do
     --skip-existing-jobs) SKIP_EXISTING_JOBS=1;;
     --disk-requirements) shift; DISK_REQUIREMENTS=$1;;
     --memory-requirements) shift; MEMORY_REQUIREMENTS=$1;;
+    --vsize-limit) shift; VSIZE_LIMIT=$1;;
     --save-failed-datafiles) SAVE_FAILED_DATAFILES=1;;
     --site-requirements) shift; SITE_REQUIREMENTS="$1";;
     --quick-test) QUICK_TEST=1;;
@@ -356,13 +359,22 @@ if [ "$REQUIRES_WHOLE_MACHINE" == "1" ]; then
   SITE_REQUIREMENTS="${SITE_REQUIREMENTS} && TARGET.CAN_RUN_WHOLE_MACHINE && TARGET.TotalMemory*1024 >= MY.ImageSize && TARGET.Memory > 0 && TARGET.TotalDisk >= MY.DiskUsage && TARGET.Disk > 0"
 fi
 
+if [ "$VSIZE_LIMIT" != "" ]; then
+  vsize_env="FARMOUT_VSIZE_LIMIT=${VSIZE_LIMIT}"
+  if [ "$VSIZE_LIMIT" -lt "$MEMORY_REQUIREMENTS" ]; then
+    echo
+    echo "WARNING: --vsize-limit=$VSIZE_LIMIT is smaller than --memory-requirements=$MEMORY_REQUIREMENTS"
+    echo
+  fi
+fi
+
 # First put all the submit file commands that are the same for all jobs.
     cat <<EOF > $submitFile
 X509UserProxy        = ${proxy}
 Universe             = vanilla
 Executable           = $Executable
 GetEnv               = true
-Environment          = "${dboard} ${save_failed_datafiles_env}"
+Environment          = "${dboard} ${save_failed_datafiles_env} ${vsize_env}"
 Copy_To_Spool        = false
 Notification         = never
 WhenToTransferOutput = On_Exit
