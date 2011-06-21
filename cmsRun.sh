@@ -196,6 +196,16 @@ echo "Current working directory: `pwd`"
 echo "df `pwd`"
 df .
 
+if [ -n "${FARMOUT_HOOK_PRERUN}" ]; then
+    if [ ! -x "${FARMOUT_HOOK_PRERUN}" ]; then
+        echo "farmout: prerun hook ${FARMOUT_HOOK_PRERUN} is not executable"
+    else
+        echo "farmout: calling prerun hook ${FARMOUT_HOOK_PRERUN}"
+        ${FARMOUT_HOOK_PRERUN}
+        echo "farmout: prerun hook ${FARMOUT_HOOK_PRERUN} returned $?"
+    fi
+fi
+
 # set vsize limit here, after file checks, so this does not
 # interfere with grid tools
 echo
@@ -267,6 +277,15 @@ if [ "$cmsRun_rc" != "0" ]; then
   exit $FAIL_JOB
 fi
 
+if [ -n "${FARMOUT_HOOK_POSTRUN}" ]; then
+    if [ ! -x "${FARMOUT_HOOK_POSTRUN}" ]; then
+        echo "farmout: postrun hook ${FARMOUT_HOOK_POSTRUN} is not executable"
+    else
+        echo "farmout: calling postrun hook ${FARMOUT_HOOK_POSTRUN}"
+        ${FARMOUT_HOOK_POSTRUN}
+        echo "farmout: postrun hook ${FARMOUT_HOOK_PRERUN} returned $?"
+    fi
+fi
 
 if [ "$JOB_GENERATES_OUTPUT_NAME" != 1 ]; then
   if ! [ -f $datafile ]; then
