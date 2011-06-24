@@ -19,8 +19,9 @@
 # Initialize default settings:
 
 # for storing output
+FARMOUT_USER=${FARMOUT_USER:-${USER}}
 SRM_SERVER=srm://cmssrm.hep.wisc.edu:8443/srm/v2/server?SFN=/hdfs
-PNFS_HOME=/store/user/$USER
+PNFS_HOME=/store/user/${FARMOUT_USER}
 
 SRM_HOME=${SRM_SERVER}${PNFS_HOME}
 
@@ -44,7 +45,7 @@ for scratch_dir in /data /scratch /tmp; do
     break
   fi
 done
-SUBMIT_HOME=${scratch_dir}/$USER
+SUBMIT_HOME=${scratch_dir}/${FARMOUT_USER}
 
 logerror() {
   echo 2>&1 "$@"
@@ -130,11 +131,13 @@ PrintUsage() {
   echo "  --accounting-group=cms_name  (username to use for fair-sharing)"
   echo "  --requires-whole-machine (job should reserve all slots on machine)"
   echo "  --output-files-per-subdir=N (0 for infinite; 500 default)"
+  echo "  --pre-hook=<exe>            (call <exe> before the job runs)"
+  echo "  --post-hook=<exe>           (call <exe> after the job runs)"
   echo ""
   exit 2
 }
 
-OPTS=`getopt -o "h" -l "help,output-dir:,submit-dir:,no-submit,skip-existing-output,skip-existing-jobs,disk-requirements:,memory-requirements:,save-failed-datafiles,site-requirements:,quick-test,extra-inputs:,accounting-group:,requires-whole-machine,output-files-per-subdir:,vsize-limit:" -- "$@"`
+OPTS=`getopt -o "h" -l "help,output-dir:,submit-dir:,no-submit,skip-existing-output,skip-existing-jobs,disk-requirements:,memory-requirements:,save-failed-datafiles,site-requirements:,quick-test,extra-inputs:,accounting-group:,requires-whole-machine,output-files-per-subdir:,vsize-limit:,pre-hook:,post-hook:" -- "$@"`
 if [ $? -ne 0 ]; then PrintUsage; fi
 
 eval set -- "$OPTS"
@@ -151,6 +154,8 @@ QUICK_TEST=
 EXTRA_INPUTS=
 REQUIRES_WHOLE_MACHINE=
 OUTPUT_FILES_PER_SUBDIR=500
+FARMOUT_HOOK_PRERUN=
+FARMOUT_HOOK_POSTRUN=
 
 while [ ! -z "$1" ]
 do
@@ -172,6 +177,8 @@ do
     --accounting-group) shift; ACCOUNTING_GROUP="+AccountingGroup=\"$1\"";;
     --requires-whole-machine) REQUIRES_WHOLE_MACHINE=1;;
     --output-files-per-subdir) shift; OUTPUT_FILES_PER_SUBDIR=$1;;
+    --pre-hook) shift; FARMOUT_HOOK_PRERUN="$1";;
+    --post-hook) shift; FARMOUT_HOOK_POSTRUN="$1";;
     --) shift; break;;
     *) die "Unexpected option $1";;
   esac
@@ -226,6 +233,15 @@ if [ "$NO_SUBMIT" != 1 ] && ! check_proxy $MIN_PROXY_HOURS $proxy; then
   die
 fi
 
+for exe in "${FARMOUT_HOOK_PRERUN}" "${FARMOUT_HOOK_POSTRUN}"; do
+    [ -z "$exe" ] && continue
+    if [ ! -x "${exe}" ]; then
+        logerror "ERROR: Hook is not executable: $exe"
+        die
+    fi
+    EXTRA_INPUTS="$EXTRA_INPUTS,$exe"
+done
+
 if [ "$EXTRA_INPUTS" != "" ]; then
   for file in ${EXTRA_INPUTS//,/ }; do
     if ! [ -a $file ]; then
@@ -234,6 +250,8 @@ if [ "$EXTRA_INPUTS" != "" ]; then
     fi
   done
 fi
+export FARMOUT_HOOK_PRERUN
+export FARMOUT_HOOK_POSTRUN
 
 # Check the config template
 
@@ -328,7 +346,7 @@ if [ "$CMS_DASHBOARD_REPORTER" = "" ]; then
    echo "No CMS_DASHBOARD_REPORTER defined, so no reporting to the CMS dashboard."
 fi
 dboard="
-dboard_taskId=${USER}-`hostname -f`-\$(Cluster)
+dboard_taskId=${FARMOUT_USER}-`hostname -f`-\$(Cluster)
 dboard_jobId=\$(Process)
 dboard_sid=\$\$([GlobalJobId])
 dboard_application=`basename ${CMSSW_HOME}`
@@ -337,7 +355,7 @@ dboard_tool=farmout
 dboard_scheduler=local-condor
 dboard_taskType=simulation
 dboard_broker=local-condor-`hostname -f`
-dboard_user=${USER}
+dboard_user=${FARMOUT_USER}
 dboard_SyncCE=${CMS_DASHBOARD_LOCAL_CE}
 CMS_DASHBOARD_REPORTER=${CMS_DASHBOARD_REPORTER}
 FARMOUT_DASHBOARD_REPORTER=${FARMOUT_DASHBOARD_REPORTER}
