@@ -592,11 +592,11 @@ do
     i=$INPUT_FILES_PER_JOB
     while [ $i -gt 0 ]; do
         nextInputFileOrigName="${nextInputFile}"
-        nextInputFile="${nextInputFile#$LOCAL_POSIX_PREFIX}"
         if [ "$prepend_local_input_dir" = 1 ]; then
             nextInputFile="${LOCAL_INPUT_DIR}${nextInputFile}"
         fi
         nextInputFilePosix="${nextInputFile}"
+        nextInputFile="${nextInputFile#$LOCAL_POSIX_PREFIX}"
 
         if [ "$check_input_file_existence" = "1" ]; then
             if ! [ -f "$nextInputFilePosix" ]; then
