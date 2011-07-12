@@ -210,8 +210,17 @@ fi
 # interfere with grid tools
 echo
 if [ "$FARMOUT_VSIZE_LIMIT" != "" ]; then
-  echo "Setting virtual memory limit to $FARMOUT_VSIZE_LIMIT Mb."
+  echo "Setting virtual memory limit to $FARMOUT_VSIZE_LIMIT MB."
   ulimit -S -v $(( $FARMOUT_VSIZE_LIMIT * 1024 )) 2>&1
+fi
+
+# We have observed problems with cmsRun using abnormally large amounts
+# of memory under Condor 7.7.0 due to the default stack size being
+# 500 MB rather than 10 MB
+FARMOUT_STACK_SIZE=${FARMOUT_STACK_SIZE:-10}
+if [ "${FARMOUT_STACK_SIZE}" != "default" ]; then
+  echo "Setting stack limit to $FARMOUT_STACK_SIZE MB."
+  ulimit -S -s $(( $FARMOUT_STACK_SIZE * 1024 )) 2>&1
 fi
 
 ulimit -a
@@ -244,6 +253,11 @@ for cfg in ${jobcfgs//,/ }; do
     cmsRun_rc=$?
 
     echo "farmout: cmsRun $cfg exited with status $cmsRun_rc at `date`"
+    if [ "$cmsRun_rc" = 255 ] && [ "$FARMOUT_VSIZE_LIMIT" != "" ]; then
+      echo
+      echo "farmout: WARNING: This may be an indication that cmsRun hit the vsize limit of "$FARMOUT_VSIZE_LIMIT" MB"
+      echo
+    fi
   fi
 
   echo "ls -ltr . intermediate"
