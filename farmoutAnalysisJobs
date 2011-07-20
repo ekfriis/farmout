@@ -440,7 +440,13 @@ fi
 
 if [ "$QUICK_TEST" != "" ]; then
   if [ "$EXPRESS_QUEUE" = "1" ]; then
-    SITE_REQUIREMENTS="${SITE_REQUIREMENTS} && IsExpressSlot =?= True"
+
+    # Require express _or_ fast slot here in order to fall back to
+    # fast slot in case user is banned from express queue.  The
+    # machine policy will prevent the job from running in the fast
+    # queue if it is allowed to run in the express queue.
+
+    SITE_REQUIREMENTS="${SITE_REQUIREMENTS} && (IsExpressSlot =?= True || IsFastSlot =?= True)"
   else
     SITE_REQUIREMENTS="${SITE_REQUIREMENTS} && IsFastSlot =?= True"
   fi
