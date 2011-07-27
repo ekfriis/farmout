@@ -131,7 +131,7 @@ check_proxy() {
 }
 
 PrintUsage() {
-  echo "USAGE: farmoutAnalysisJobs [options] <jobName> <CMSSW Path> <config file>"
+  echo "USAGE: farmoutAnalysisJobs [options] <jobName> <CMSSW Path> <config file> [extra-cmsRun-args]"
   echo ""
   echo "OPTIONS:"
   echo "  --output-dir=${SRM_HOME}/<jobName>-<runName>"
@@ -270,7 +270,7 @@ for exe in scramv1 condor_submit cmsRun.sh readlink voms-proxy-info ; do
   fi
 done
 
-if [ "$#" -ne 3 ]; then PrintUsage; fi
+if [ "$#" -lt 3 ]; then PrintUsage; fi
 
 
 # Additional command-line arguments
@@ -278,6 +278,15 @@ if [ "$#" -ne 3 ]; then PrintUsage; fi
 jobName=$1
 CMSSW_HOME=`realpath $2`
 configTemplate=`realpath $3`
+shift 3
+
+# get extra arguments in condor arg syntax
+EXTRA_CMSRUN_ARGS=""
+while [ "$1" != "" ]; do
+  escaped_arg=$(echo $1 | sed "s|'|''|g; s|\"|\"\"|g")
+  shift
+  EXTRA_CMSRUN_ARGS="$EXTRA_CMSRUN_ARGS '$escaped_arg'"
+done
 
 # Now we have all the user's input.
 
@@ -304,15 +313,15 @@ if [ "$FWKLITE" != 1 ]; then
   fi
 
   macro='$outputFileName'
-  if [ "$JOB_GENERATES_OUTPUT_NAME" != "1" ] && ! grep -F -q $macro $configTemplate; then
+  if [ "$JOB_GENERATES_OUTPUT_NAME" != "1" ] && ! grep -F -q $macro $configTemplate && ! ( echo "$EXTRA_CMSRUN_ARGS" | grep -F -q $macro ); then
 
-    die "$macro must appear on the configuration template.  Either specify --job-generates-output-name or put $macro in $configTemplate to let the output file name to be configured"
+    die "$macro must appear in the configuration template or in the extra cmsRun arguments.  Either specify --job-generates-output-name or put $macro in $configTemplate or the extra cmsRun arguments to let the output file name be configured"
 
   fi
 
   for macro in \$inputFileNames; do
-    if ! grep -F -q $macro $configTemplate; then
-      die "$macro must appear on the configuration template.  I can't find it in $configTemplate"
+    if ! grep -F -q $macro $configTemplate && ! ( echo "$EXTRA_CMSRUN_ARGS" | grep -F -q $macro ); then
+      die "$macro must appear in the configuration template or in the extra cmsRun arguments.  I can't find it in $configTemplate or in the extra cmsRun arguments."
     fi
   done
 fi
@@ -712,13 +721,26 @@ do
          s|,|\n|g" > $jobcfg
     fi
 
+    job_extra_args=""
+    if [ "$EXTRA_CMSRUN_ARGS" != "" ]; then
+      # Note that we just strip double-quotes out of inputFileNames,
+      # because cmsRun does not expect the file names to be quoted
+      # on the commandline.
+      escaped_inputFileNames=$(echo "$inputFileNames" | sed "s|'|''|g; s|\"||g")
+      escaped_outputFileName=$(echo "$outputFileName" | sed "s|'|''|g; s|\"|\"\"|g")
+      job_extra_args=$(echo "$EXTRA_CMSRUN_ARGS" | sed \
+          "s|\\\$inputFileNames|$escaped_inputFileNames|g;
+           s|\\\$outputFileName|$escaped_outputFileName|g;
+           s|\\\$jobNumber|$output_file_count|g" )
+    fi
+
 #
 # Prepare condor submit file for the job
 #
     cat >> $submitFile <<EOF
 
 InitialDir           = $jobtag
-Arguments            = $jobcfg `basename $outputFileName` $job_output_dir
+Arguments            = "$jobcfg `basename $outputFileName` $job_output_dir$job_extra_args"
 Transfer_Input_Files = $inputfiles
 output               = $stdout
 error                = $stderr

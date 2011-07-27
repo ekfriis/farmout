@@ -111,7 +111,7 @@ check_proxy() {
 }
 
 PrintUsage() {
-  echo "USAGE: farmoutRandomSeedJobs [options] <jobName> <events> <events-per-job> <CMSSW Path> <config files>"
+  echo "USAGE: farmoutRandomSeedJobs [options] <jobName> <events> <events-per-job> <CMSSW Path> <config files> [extra-cmsRun-args]"
   echo ""
   echo "OPTIONS:"
   echo "  --output-dir=${SRM_HOME}/<jobName>"
@@ -205,9 +205,20 @@ configTemplate=`realpath $5`
 shift 5
 chainedConfigs=""
 while [ "$1" != "" ]; do
+   if [ "${1/*=*/is_cmsRunOption}" = "is_cmsRunOption" ]; then
+     break
+   fi
    cfg=`realpath $1`
    chainedConfigs="$chainedConfigs $cfg"
    shift
+done
+
+# get extra arguments in condor arg syntax
+EXTRA_CMSRUN_ARGS=""
+while [ "$1" != "" ]; do
+  escaped_arg=$(echo $1 | sed "s|'|''|g; s|\"|\"\"|g")
+  shift
+  EXTRA_CMSRUN_ARGS="$EXTRA_CMSRUN_ARGS '$escaped_arg'"
 done
 
 #       Ensure that your environment is correct
@@ -265,8 +276,8 @@ if [ "$CFG_EXTENSION" != "py" ] && [ "$CFG_EXTENSION" != "cfg" ]; then
 fi
 
 for macro in \$randomNumber \$nEventsPerJob \$outputFileName; do
-  if ! grep -F -q $macro $configTemplate; then
-    die "$macro must appear on the configuration template.  I can't find it in $configTemplate, so I am going to abort.  If you know what you are doing and this macro really isn't needed, simply put this macro in a comment in your template so that I see it and conclude that all is well."
+  if ! grep -F -q $macro $configTemplate && ! ( echo "$EXTRA_CMSRUN_ARGS" | grep -F -q $macro ); then
+    die "$macro must appear in the configuration template or in the extra cmsRun arguments.  I can't find it in $configTemplate or the cmsRun arguments, so I am going to abort.  If you know what you are doing and this macro really isn't needed, simply put this macro in a comment in your template so that I see it and conclude that all is well."
   fi
 done
 
@@ -277,6 +288,8 @@ for cfg in ${chainedConfigs}; do
     die "The chained config template $cfg is expected to be the same type of config file as the base config file (${CFG_EXTENSION})."
   fi
   for macro in \$inputFileNames \$outputFileName; do
+    # Currently, macros in arguments to chained runs are not supported,
+    # so require the macros to appear in the chained config files.
     if ! grep -F -q $macro $cfg; then
       die "$macro must appear in the chained configuration template.  I can't find it in $cfg"
     fi
@@ -287,6 +300,7 @@ done
 # operation will do the wrong thing on longer macros having a common
 # prefix with a shorter macro.
 randomMacros=`grep -o '\$randomNumber[0-9]*' $configTemplate | sort -r | uniq`
+randomMacrosInArgs=`echo "$EXTRA_CMSRUN_ARGS" | grep -o '\$randomNumber[0-9]*'  | sort -r | uniq`
 
 #
 # Environment setup
@@ -480,6 +494,12 @@ while (( $nEvents > $nEventsSubmitted )); do
 
         randomSed="${randomSed}s/\\${randomMacro}/${randomNumber}/g;"
     done
+    randomSedInArgs=""
+    for randomMacro in $randomMacrosInArgs; do
+        randomNumber=$(( (${RANDOM} + (${job}<<15)) % 900000000 ))
+
+        randomSedInArgs="${randomSedInArgs}s/\\${randomMacro}/${randomNumber}/g;"
+    done
 
 #
 # Create the job subdirectory
@@ -496,6 +516,15 @@ while (( $nEvents > $nEventsSubmitted )); do
        s|\\\$outputFileName|$step1_outputFileName|g;
        s|\\\$jobNumber|$(($job-1))|g" > $jobtag/$jobcfg
 
+    job_extra_args=""
+    if [ "$EXTRA_CMSRUN_ARGS" != "" ]; then
+      escaped_outputFileName=$(echo "$outputFileName" | sed "s|'|''|g; s|\"|\"\"|g")
+      job_extra_args=$(echo "$EXTRA_CMSRUN_ARGS" | sed \
+      "${randomSedInArgs}
+       s|\\\$nEventsPerJob|$nEventsPerJob|g;
+       s|\\\$outputFileName|$step1_outputFileName|g;
+       s|\\\$jobNumber|$(($job-1))|g" )
+    fi
 
     jobinputfiles="$jobcfg"
     jobcfgs="$jobcfg"
@@ -531,7 +560,7 @@ while (( $nEvents > $nEventsSubmitted )); do
     cat <<EOF >> $submitFile
 
 InitialDir           = $jobtag
-Arguments            = $jobcfgs $outputFileName $job_output_dir
+Arguments            = "$jobcfgs $outputFileName $job_output_dir$job_extra_args"
 Transfer_Input_Files = $jobinputfiles
 output               = $stdout
 error                = $stderr

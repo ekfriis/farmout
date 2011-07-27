@@ -2,8 +2,11 @@
 #
 
 jobcfgs=$1
-datafile=$2
-SRM_OUTPUT_DIR=$3
+shift
+datafile=$1
+shift
+SRM_OUTPUT_DIR=$1
+shift
 if [ "$SRM_OUTPUT_DIR" = "." ]; then
   # no SRM stage-out; files are being copied back to submit dir
   SRM_OUTPUT_DIR=""
@@ -241,7 +244,7 @@ for cfg in ${jobcfgs//,/ }; do
     export OUTPUT="$datafile"
     echo "farmout: starting $cmsRun with INPUT=$INPUT and OUTPUT=$OUTPUT at `date`"
 
-    $cmsRun
+    $cmsRun "$@"
     cmsRun_rc=$?
 
     echo "farmout: $cmsRun exited with status $cmsRun_rc at `date`"
@@ -249,7 +252,7 @@ for cfg in ${jobcfgs//,/ }; do
     echo "farmout: starting cmsRun $cfg at `date`"
 
     jobreport="${cfg%.*}.xml"
-    cmsRun --jobreport=$jobreport $cfg
+    cmsRun --jobreport=$jobreport $cfg "$@"
     cmsRun_rc=$?
 
     echo "farmout: cmsRun $cfg exited with status $cmsRun_rc at `date`"
