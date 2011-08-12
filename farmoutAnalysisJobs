@@ -74,6 +74,8 @@ realpath() {
   readlink -f $1
 }
 
+FARMOUT_HOME=$(dirname $(realpath $0))
+
 logerror() {
   echo 2>&1 "$@"
 }
@@ -161,6 +163,8 @@ PrintUsage() {
   echo "  --accounting-group=cms_name  (username to use for fair-sharing)"
   echo "  --requires-whole-machine (job should reserve all slots on machine)"
   echo "  --fwklite                (in this case, provide script instead of config)"
+  echo "  --merge                     (merge input files; no cfg file expected)"
+  echo "  --use-hadd                  (use hadd to merge files instead of mergeFiles.C)"
   echo "  --output-files-per-subdir=N (0 for infinite; 500 default)"
   echo "  --job-generates-output-name (don't try to control output file name)"
   echo "  --dbs-service-url=X         (global DBS by default)"
@@ -169,7 +173,7 @@ PrintUsage() {
   exit 2
 }
 
-OPTS=`getopt -o "h" -l "help,output-dir:,input-dir:,submit-dir:,no-submit,job-count:,skip-existing-output,skip-existing-jobs,match-input-files:,exclude-input-files:,input-files-per-job:,disk-requirements:,memory-requirements:,input-file-list:,input-dbs-path:,input-runs:,save-failed-datafiles,save-missing-input-file-list:,assume-input-files-exist,site-requirements:,quick-test,extra-inputs:,accounting-group:,requires-whole-machine,fwklite,output-files-per-subdir:,job-generates-output-name,dbs-service-url:,express-queue,vsize-limit:" -- "$@"`
+OPTS=`getopt -o "h" -l "help,output-dir:,input-dir:,submit-dir:,no-submit,job-count:,skip-existing-output,skip-existing-jobs,match-input-files:,exclude-input-files:,input-files-per-job:,disk-requirements:,memory-requirements:,input-file-list:,input-dbs-path:,input-runs:,save-failed-datafiles,save-missing-input-file-list:,assume-input-files-exist,site-requirements:,quick-test,extra-inputs:,accounting-group:,requires-whole-machine,fwklite,output-files-per-subdir:,job-generates-output-name,dbs-service-url:,express-queue,vsize-limit:,merge,use-hadd" -- "$@"`
 if [ $? -ne 0 ]; then PrintUsage; fi
 
 eval set -- "$OPTS"
@@ -201,6 +205,8 @@ APPLICATION=cmsRun
 OUTPUT_FILES_PER_SUBDIR=500
 JOB_GENERATES_OUTPUT_NAME=0
 EXPRESS_QUEUE=0
+MERGE=
+USE_HADD=
 
 while [ ! -z "$1" ]
 do
@@ -236,6 +242,8 @@ do
     --job-generates-output-name) JOB_GENERATES_OUTPUT_NAME=1;;
     --dbs-service-url) shift; DBS_URL_ARG="--url=$1";;
     --express-queue) EXPRESS_QUEUE=1;;
+    --merge) MERGE=1;;
+    --use-hadd) USE_HADD=1;;
 #    --use-hdfs)
 #        SRM_SERVER=srm://cmshdfs01.hep.wisc.edu:8443/srm/v2/server?SFN=
 #        PNFS_HOME=/hdfs/store/user/${FARMOUT_USER}
@@ -263,6 +271,10 @@ then
   die "The option --job-generates-output-name conflicts with --skip-existing-output"
 fi
 
+if [ "$MERGE" != "1" ] && [ "$USE_HADD" = "1" ]; then
+  die "The option --use-hadd requires --merge"
+fi
+
 # Check for some required utilities
 for exe in scramv1 condor_submit cmsRun.sh readlink voms-proxy-info ; do
   if ! which $exe >& /dev/null; then
@@ -270,23 +282,57 @@ for exe in scramv1 condor_submit cmsRun.sh readlink voms-proxy-info ; do
   fi
 done
 
-if [ "$#" -lt 3 ]; then PrintUsage; fi
+if [ "$MERGE" = "1" ]; then
+  if [ "$#" -lt 2 ]; then PrintUsage; fi
+  if [ "$INPUT_FILES_PER_JOB" -lt 2 ]; then
+    die "You must specify --input-files-per-job=N with --merge."
+  fi
+else
+  if [ "$#" -lt 3 ]; then PrintUsage; fi
+fi
 
 
 # Additional command-line arguments
 
 jobName=$1
-CMSSW_HOME=`realpath $2`
-configTemplate=`realpath $3`
-shift 3
+shift
+CMSSW_HOME=`realpath $1`
+shift
 
-# get extra arguments in condor arg syntax
-EXTRA_CMSRUN_ARGS=""
-while [ "$1" != "" ]; do
-  escaped_arg=$(echo $1 | sed "s|'|''|g; s|\"|\"\"|g")
+if [ "$MERGE" = "1" ]; then
+  # In merge mode, we set a bunch of other options automatically,
+  # in order to run the merge job.
+
+  if [ "$#" -gt 0 ]; then
+    die "Unexpected extra arguments in --merge mode: $@"
+  fi
+
+  FWKLITE=1
+  APPLICATION=merge
+
+  configTemplate="${FARMOUT_HOME}/mergeFilesJob"
+
+  # if using mergeFiles.C to do the merge, add that to the extra inputs list
+  if [ "$USE_HADD" != 1 ]; then
+    if ! [ -z "$EXTRA_INPUTS" ]; then
+      EXTRA_INPUTS="${EXTRA_INPUTS},"
+    fi
+    EXTRA_INPUTS="${EXTRA_INPUTS}${FARMOUT_HOME}/mergeFiles.C"
+  fi
+
+else
+  configTemplate=`realpath $1`
   shift
-  EXTRA_CMSRUN_ARGS="$EXTRA_CMSRUN_ARGS '$escaped_arg'"
-done
+
+  # get extra arguments in condor arg syntax
+  EXTRA_CMSRUN_ARGS=""
+  while [ "$1" != "" ]; do
+    escaped_arg=$(echo $1 | sed "s|'|''|g; s|\"|\"\"|g")
+    shift
+    EXTRA_CMSRUN_ARGS="$EXTRA_CMSRUN_ARGS '$escaped_arg'"
+  done
+
+fi
 
 # Now we have all the user's input.
 

@@ -54,30 +54,52 @@ void mergeFiles(const char* outputFile, const char* inputFilesDirectory) {
   // Do the following
   // root > .L mergeFiles.C
   // root > mergeFiles("<outputFile>", "<inputFilesDirectory>")
-   
+
   Target = TFile::Open(outputFile, "RECREATE");
 
-  void* dirp = gSystem->OpenDirectory(inputFilesDirectory);
-  const char *entry = gSystem->GetDirEntry(dirp);
-  while(entry != 0)
-    {
-      int len = strlen(entry);
-      if(len >= 5 && strcmp(&entry[len - 5], ".root") == 0)
-        {
-          TString fileName;
-          if(strncmp(inputFilesDirectory, "/pnfs", 5) == 0)
-            {
-              fileName = "dcap://";
-            }
-          fileName += inputFilesDirectory;
-		  if( !fileName.EndsWith("/") ) fileName += "/";
-          fileName += entry;
+  if(strncmp(inputFilesDirectory,"list-in-file:",13)==0) {
+	  // Read input file list from a file
+	  char const *list_in_file = inputFilesDirectory+13;
+	  FILE *fp = fopen(list_in_file,"r");
+	  if( !fp ) {
+		  int the_errno = errno;
+		  cerr << "Failed to open " << list_in_file << ": errno=" << the_errno << " " << strerror(errno) << endl;
+		  return;
+	  }
+	  char fname[2048];
+	  while( fgets(fname,sizeof(fname),fp)!=NULL ) {
+		  char *newline = strchr(fname,'\n');
+		  if( newline ) *newline = '\0';
+		  if( !fname[0] ) continue;
 
-          cout << "Merging root file: " << fileName << endl;
-          MergeRootfile( Target, fileName );
+          cout << "Merging root file: " << fname << endl;
+          MergeRootfile( Target, fname );
+	  }
+	  fclose(fp);
+  }
+  else {
+	void* dirp = gSystem->OpenDirectory(inputFilesDirectory);
+	const char *entry = gSystem->GetDirEntry(dirp);
+	while(entry != 0)
+	{
+		int len = strlen(entry);
+		if(len >= 5 && strcmp(&entry[len - 5], ".root") == 0)
+		{
+			TString fileName;
+			if(strncmp(inputFilesDirectory, "/pnfs", 5) == 0)
+			{
+				fileName = "dcap://";
+            }
+			fileName += inputFilesDirectory;
+			if( !fileName.EndsWith("/") ) fileName += "/";
+			fileName += entry;
+
+			cout << "Merging root file: " << fileName << endl;
+			MergeRootfile( Target, fileName );
         }
-      entry = gSystem->GetDirEntry(dirp);
+		entry = gSystem->GetDirEntry(dirp);
     }
+  }
 
   // save modifications to target file
   WriteMergeObjects( Target );

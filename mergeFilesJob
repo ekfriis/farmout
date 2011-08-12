@@ -1,0 +1,27 @@
+#!/bin/sh
+
+# This script is intended to be run by farmout's cmsRun.sh in "fwklite" mode.
+# It runs on the worker node and merges root files into one file.
+
+if [ -z "${INPUT}" ] || [ -z "${OUTPUT}"; then
+  echo "Expected INPUT and OUTPUT to be defined in the environment." 1>&2
+  exit 2
+fi
+
+if ! [ -f "${INPUT}" ]; then
+  echo "Cannot find file pointed to by INPUT: ${INPUT}" 1>&2
+  exit 1
+fi
+
+if ! [ -z "$USE_HADD" ]; then
+  exec hadd "${OUTPUT}" `cat ${INPUT}`
+else
+
+  if ! [ -f mergeFiles.C ]; then
+    echo "Cannot find required file mergeFiles.C" 1>&2
+    exit 1
+  fi
+
+  exec root -q -b "mergeFiles.C(\"${OUTPUT}\",\"list-in-file:${INPUT}\")"
+fi
+
