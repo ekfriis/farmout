@@ -91,72 +91,27 @@ RunWithTimeout() {
     done
 }
 
-# create a directory and any missing parent directories
-DoSrmMkdir() {
-    local dest="$1"
-    if srmmkdir -debug=true -retry_num=0 ${dest}; then
-        echo "Creation of ${dest} succeeded."
-        return 0
-    fi
-
-    local parent_dir=`dirname ${dest}`
-
-    # Test to see if parent dir looks like a valid SRM path.
-    # If not, we have probably stepped too far back into the URL.
-
-    if [ "$parent_dir" = "$dest" ]; then
-        return 1
-    fi
-
-    if ( echo $dest | grep -q ':[0-9]' ) && ! ( echo $parent_dir | grep -q ':[0-9]' ); then
-        # the ":port" specification has been eaten by dirname, so
-	# we have gone too far
-        return 1
-    fi
-
-    if ( echo $dest | grep -q 'SFN=' ) && ! ( echo $parent_dir | grep -q 'SFN=' ); then
-        # the "SFN=" specification has been eaten by dirname, so
-	# we have gone too far
-        return 1
-    fi
-
-    echo "Attempting to create parent directory ${parent_dir}, in case that is the problem."
-    if DoSrmMkdir ${parent_dir}; then
-        echo "Creation of parent directory succeeded.  Now try creating ${dest} again."
-        if srmmkdir -debug=true -retry_num=0 ${dest}; then
-            echo "Creation of ${dest} succeeded."
-            return 0
-        fi
-    fi
-
-    return 1
-}
-
 DoSrmcp() {
     local src="$1"
     local dest="$2"
 
-    # The internal retries in srmcp are often useless, because a broken file
-    # may be left behind (as of dCache 1.7.0-38), so further attempts to
-    # copy the file will all fail with the error "file exists".  Therefore,
-    # we have our own retry loop, including deletion of broken files.
-
     local tries=0
     while [ "$tries" -lt 3 ]; do
       if [ "$tries" -gt 1 ]; then
-        echo "Trying again at `date`: srmcp $src $dest"
+        echo "Trying again at `date`: lcg-cp -bD srmv2 $src $dest"
       fi
 
-      RunWithTimeout $SRM_TIMEOUT srmcp -2 -debug=true -retry_num=0 "$src" "$dest"
+      RunWithTimeout $SRM_TIMEOUT lcg-cp -bD srmv2 "$src" "$dest"
       rc=$?
 
       if [ "$rc" = "0" ]; then
+        echo "successful file transfer: lcg-cp -bD srmv2 $src $dest"
         return 0
       fi
 
       echo
       echo
-      echo "srmcp exited with non-zero status $rc at `date`."
+      echo "lcg-cp exited with non-zero status $rc at `date`."
       echo "This happened when copying $src to $dest."
       echo
 
@@ -168,9 +123,6 @@ DoSrmcp() {
          if [ "$rc" != "0" ]; then
            echo "srmrm failed with exit status $rc at `date`."
          fi
-      else
-         echo "Attempting to create target directories in case that is the problem."
-         DoSrmMkdir `dirname $dest`
       fi
 
       tries=$(($tries+1))
@@ -296,7 +248,7 @@ ulimit -S -v unlimited 2>&1
 if [ "$cmsRun_rc" != "0" ]; then
   echo "$cmsRun exited with status $cmsRun_rc"
   if [ -f $datafile ] && [ "$SAVE_FAILED_DATAFILES" = "1" ] && [ "$SRM_OUTPUT_DIR" != "" ]; then
-    if ! DoSrmcp "file://localhost/`pwd`/$datafile" "$SRM_FAILED_OUTPUT_FILE"; then
+    if ! DoSrmcp "$datafile" "$SRM_FAILED_OUTPUT_FILE"; then
       echo "Failed to save datafile from failed run."
     fi
   fi
@@ -327,7 +279,7 @@ if [ "$JOB_GENERATES_OUTPUT_NAME" != 1 ]; then
   fi
 
   if [ "$SRM_OUTPUT_DIR" != "" ]; then
-    if ! DoSrmcp "file://localhost/`pwd`/$datafile" "$SRM_OUTPUT_FILE"; then
+    if ! DoSrmcp "$datafile" "$SRM_OUTPUT_FILE"; then
       dashboard_completion 60307
       rm -f *.root
       exit 1
@@ -341,7 +293,7 @@ fi
 
 if [ "$SRM_OUTPUT_DIR" != "" ]; then
   for file in `ls -1 *.root 2>/dev/null`; do
-      if ! DoSrmcp file://localhost/`pwd`/$file $SRM_OUTPUT_DIR/$file; then
+      if ! DoSrmcp $file $SRM_OUTPUT_DIR/$file; then
           dashboard_completion 60307
           rm -f *.root
 	  exit 1
