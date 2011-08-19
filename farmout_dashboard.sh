@@ -102,7 +102,7 @@ report_completion() {
     fi
 
     required_args="ExeTime ExeExitCode"
-    optional_args=""
+    optional_args="ExeCPU CrabUserCpuTime CrabSysCpuTime"
     check_required_dashboard_args ${required_args}
     build_dashboard_args ${required_args} ${optional_args}
     report_to_dashboard "$dboard_args"

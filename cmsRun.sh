@@ -230,6 +230,8 @@ ulimit -a
 echo
 
 start_time=`date "+%s"`
+user_time=0
+sys_time=0
 
 cmsRun=cmsRun
 
@@ -244,7 +246,7 @@ for cfg in ${jobcfgs//,/ }; do
     export OUTPUT="$datafile"
     echo "farmout: starting $cmsRun with INPUT=$INPUT and OUTPUT=$OUTPUT at `date`"
 
-    $cmsRun "$@"
+    /usr/bin/time -p -o exe_time $cmsRun "$@"
     cmsRun_rc=$?
 
     echo "farmout: $cmsRun exited with status $cmsRun_rc at `date`"
@@ -252,7 +254,7 @@ for cfg in ${jobcfgs//,/ }; do
     echo "farmout: starting cmsRun $cfg at `date`"
 
     jobreport="${cfg%.*}.xml"
-    cmsRun --jobreport=$jobreport $cfg "$@"
+    /usr/bin/time -p -o exe_time cmsRun --jobreport=$jobreport $cfg "$@"
     cmsRun_rc=$?
 
     echo "farmout: cmsRun $cfg exited with status $cmsRun_rc at `date`"
@@ -262,6 +264,12 @@ for cfg in ${jobcfgs//,/ }; do
       echo
     fi
   fi
+
+  user_time=`awk "/^user/ {print ${user_time}+\\$2}" exe_time`
+  sys_time=`awk "/^sys/ {print ${sys_time}+\\$2}" exe_time`
+
+  echo "time output:"
+  cat exe_time
 
   echo "ls -ltr . intermediate"
   ls -ltr . intermediate
@@ -273,6 +281,14 @@ for cfg in ${jobcfgs//,/ }; do
 done
 
 export dboard_ExeTime=$((`date "+%s"` -  $start_time))
+
+export dboard_ExeCPU=$(echo | awk "{print $user_time + $sys_time}")
+
+# Technically, the following should include cpu time for cmsRun + cmsRun.sh
+# and everything that happens in the job.  However, we just report the
+# exe cpu time.
+export dboard_CrabUserCpuTime=$user_time
+export dboard_CrabSysCpuTime=$sys_time
 
 # remove vsize limit so it does not interfere with file transfer
 ulimit -S -v unlimited 2>&1
