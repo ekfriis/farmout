@@ -17,6 +17,7 @@
 
 
 # Initialize default settings:
+FARMOUT_HOME=${FARMOUT_HOME:-$(dirname $(realpath $0))}
 
 # for storing output
 FARMOUT_USER=${FARMOUT_USER:-${USER}}
@@ -74,7 +75,6 @@ realpath() {
   readlink -f $1
 }
 
-FARMOUT_HOME=$(dirname $(realpath $0))
 
 logerror() {
   echo 2>&1 "$@"
@@ -86,6 +86,18 @@ die() {
     logerror "$@"
   fi
   exit 1
+}
+
+incrfname () {
+    fname="$1"
+    if [ -f "$fname" ]; then
+        num=1
+        while [ -f "$fname.$num" ]; do
+            let num+=1
+        done
+        fname="$fname.$num"
+    fi
+    echo "$fname"
 }
 
 outputFileExists() {
@@ -101,6 +113,11 @@ outputFileExists() {
     return 0
   fi
   return 1
+}
+
+find_dag_inputs() {
+    find "$LAST_SUBMIT_DIR" -type f -name submit -print0 | xargs -r0 \
+        sed -nre "s|^# DAG_OUTPUT_FILENAME (.*)|${DCAP_SERVER}\1|p"
 }
 
 check_proxy() {
@@ -168,12 +185,14 @@ PrintUsage() {
   echo "  --output-files-per-subdir=N (0 for infinite; 500 default)"
   echo "  --job-generates-output-name (don't try to control output file name)"
   echo "  --dbs-service-url=X         (global DBS by default)"
+  echo "  --output-dag-file=X"
+  echo "  --last-submit-dir=X"
   echo ""
   echo "Note that <runName> is taken from the name of the config file."
   exit 2
 }
 
-OPTS=`getopt -o "h" -l "help,output-dir:,input-dir:,submit-dir:,no-submit,job-count:,skip-existing-output,skip-existing-jobs,match-input-files:,exclude-input-files:,input-files-per-job:,disk-requirements:,memory-requirements:,input-file-list:,input-dbs-path:,input-runs:,save-failed-datafiles,save-missing-input-file-list:,assume-input-files-exist,site-requirements:,quick-test,extra-inputs:,accounting-group:,requires-whole-machine,fwklite,output-files-per-subdir:,job-generates-output-name,dbs-service-url:,express-queue,vsize-limit:,merge,use-hadd" -- "$@"`
+OPTS=`getopt -o "h" -l "help,output-dir:,input-dir:,submit-dir:,no-submit,job-count:,skip-existing-output,skip-existing-jobs,match-input-files:,exclude-input-files:,input-files-per-job:,disk-requirements:,memory-requirements:,input-file-list:,input-dbs-path:,input-runs:,save-failed-datafiles,save-missing-input-file-list:,assume-input-files-exist,site-requirements:,quick-test,extra-inputs:,accounting-group:,requires-whole-machine,fwklite,output-files-per-subdir:,job-generates-output-name,dbs-service-url:,express-queue,vsize-limit:,merge,use-hadd,output-dag-file:,last-submit-dir:" -- "$@"`
 if [ $? -ne 0 ]; then PrintUsage; fi
 
 eval set -- "$OPTS"
@@ -207,6 +226,8 @@ JOB_GENERATES_OUTPUT_NAME=0
 EXPRESS_QUEUE=0
 MERGE=
 USE_HADD=
+OUTPUT_DAG_FILE=
+LAST_SUBMIT_DIR=
 
 while [ ! -z "$1" ]
 do
@@ -244,6 +265,8 @@ do
     --express-queue) EXPRESS_QUEUE=1;;
     --merge) MERGE=1;;
     --use-hadd) USE_HADD=1;;
+    --output-dag-file) shift; OUTPUT_DAG_FILE="$1";;
+    --last-submit-dir) shift; LAST_SUBMIT_DIR="$1";;
 #    --use-hdfs)
 #        SRM_SERVER=srm://cmshdfs01.hep.wisc.edu:8443/srm/v2/server?SFN=
 #        PNFS_HOME=/hdfs/store/user/${FARMOUT_USER}
@@ -388,8 +411,14 @@ SUBMIT_DIR=${SUBMIT_DIR:-${SUBMIT_HOME}/$jobName-$runName}
 #Strip off server part of input path
 LOCAL_INPUT_DIR=${INPUT_DIR#$DCAP_SERVER}
 
-#Get the part of INPUT_DIR that was stripped off.
+#Get the part of INPUT_DIR that was stripped off and make sure INPUT_BASE ends
+#with a trailing slash. If we're building a DAG, we don't need INPUT_BASE at
+#all.
 INPUT_BASE=${INPUT_DIR%$LOCAL_INPUT_DIR}
+INPUT_BASE="${INPUT_BASE%/}/"
+if [ "$LAST_SUBMIT_DIR" != "" ]; then
+    INPUT_BASE=
+fi
 
 if [ -d "${LOCAL_POSIX_PREFIX}${LOCAL_INPUT_DIR}" ]; then
     LOCAL_INPUT_DIR="${LOCAL_POSIX_PREFIX}${LOCAL_INPUT_DIR}"
@@ -400,6 +429,11 @@ if [ "$INPUT_FILE_LIST" != "" ]; then
         die "Error: No such file: $INPUT_FILE_LIST"
     fi
     INPUT_FILE_LIST=`realpath $INPUT_FILE_LIST`
+elif [ "$LAST_SUBMIT_DIR" != "" ]; then
+    if ! [ -d "$LAST_SUBMIT_DIR" ]; then
+        die "Error: No such directory: $LAST_SUBMIT_DIR"
+    fi
+    LAST_SUBMIT_DIR=`realpath $LAST_SUBMIT_DIR`
 elif ! [ -d "${LOCAL_INPUT_DIR}" ]; then
   die "Error: No such input directory: ${LOCAL_INPUT_DIR}"
 fi
@@ -469,14 +503,13 @@ farmoutLogFile=$runDir/farmoutAnalysisJobs.log
 
 # Make sure submitFile name is unique in case we are continuing a previous
 # submission.
-if [ -f $submitFile ]; then
-  num=1
-  while [ -f $submitFile.$num ]; do
-    num=$(($num+1))
-  done
-  submitFile=$submitFile.$num
-fi
+submitFile=$(incrfname "$submitFile")
 
+# If building a DAG, zero out the DAG input file if last-submit-dir is not
+# specified.
+if [ "$OUTPUT_DAG_FILE" != "" ] && [ "$LAST_SUBMIT_DIR" == "" ]; then
+    echo -n >| "$OUTPUT_DAG_FILE"
+fi
 
 mkdir -p $runDir
 
@@ -642,6 +675,9 @@ if [ "$INPUT_FILE_LIST" != "" ]; then
   find_command="cat $INPUT_FILE_LIST"
   check_input_file_existence=${ASSUME_INPUT_FILES_EXIST:-1}
   prepend_local_input_dir=1
+elif [ "$LAST_SUBMIT_DIR" != "" ]; then
+  find_command="find_dag_inputs"
+  check_input_file_existence=0
 fi
 
 count=0
@@ -650,6 +686,7 @@ $find_command |
 while read nextInputFile
 do
     inputFileNames=""
+    parentJobTags=""
     i=$INPUT_FILES_PER_JOB
     while [ $i -gt 0 ]; do
         nextInputFileOrigName="${nextInputFile}"
@@ -672,11 +709,15 @@ do
             fi
         fi
 
+        parentJobTag="$(basename "${nextInputFileOrigName}" .root)"
+
         if [ "$inputFileNames" = "" ]; then
-            inputFileNames="\"${INPUT_BASE}/$nextInputFile\""
+            inputFileNames="\"${INPUT_BASE}$nextInputFile\""
             firstInputFile="${nextInputFile}"
+            parentJobTags="${parentJobTag}"
         else
-            inputFileNames="${inputFileNames},\"${INPUT_BASE}/$nextInputFile\""
+            inputFileNames="${inputFileNames},\"${INPUT_BASE}$nextInputFile\""
+            parentJobTags="${parentJobTags} ${parentJobTag}"
         fi
 
         i=$(($i-1))
@@ -751,6 +792,18 @@ do
     mkdir -p $jobtag
     cd $jobtag || die "Failed to cd to $jobtag"
 
+    jobSubmitFile=$submitFile
+    if [ -n "$OUTPUT_DAG_FILE" ]; then
+        jobSubmitFile="$(incrfname "$PWD/submit")"
+        cp "$submitFile" "$jobSubmitFile"
+        echo "JOB $jobtag $jobSubmitFile" >> "$OUTPUT_DAG_FILE"
+        if [ "$LAST_SUBMIT_DIR" != "" ]; then
+            for parent in $parentJobTags; do
+                echo "PARENT $parent CHILD $jobtag" >> "$OUTPUT_DAG_FILE"
+            done
+        fi
+    fi
+
 #
 # Prepare job configuration file
 #
@@ -783,9 +836,9 @@ do
 #
 # Prepare condor submit file for the job
 #
-    cat >> $submitFile <<EOF
+    cat >> $jobSubmitFile <<EOF
 
-InitialDir           = $jobtag
+InitialDir           = $PWD
 Arguments            = "$jobcfg `basename $outputFileName` $job_output_dir$job_extra_args"
 Transfer_Input_Files = $inputfiles
 output               = $stdout
@@ -793,6 +846,12 @@ error                = $stderr
 Log                  = $conlog
 Queue
 EOF
+
+    # Explicitly track output files in case later invocations require them as
+    # inputs.
+    if [ "$OUTPUT_DAG_FILE" != "" ]; then
+        echo "# DAG_OUTPUT_FILENAME ${job_output_dir#${SRM_SERVER}}/$outputFileName" >> $jobSubmitFile
+    fi
 done || die
 
 echo ""
@@ -802,7 +861,21 @@ cd $runDir
 #
 # Submit the job
 #
-if ! grep -q ^Queue $submitFile; then
+
+# Wrap the real DAG with a thin outer DAG. The real DAG becomes a node with a
+# SCRIPT POST that will inform the user about the outcome of their workflow.
+wrapDag () {
+    cat <<EOF > ${OUTPUT_DAG_FILE}.wrapper
+SUBDAG EXTERNAL farmout $OUTPUT_DAG_FILE
+SCRIPT POST farmout ${FARMOUT_HOME}/dag-wrapper.sh \$JOBID \$RETURN \
+    OUTPUT_DAG_FILE=$OUTPUT_DAG_FILE \
+    FARMOUT_USER=$FARMOUT_USER \
+    USER=$USER \
+    OUTPUT_DIR=${OUTPUT_DIR}
+EOF
+}
+
+if [ -z "$OUTPUT_DAG_FILE" ] && ! grep -q ^Queue $submitFile; then
   echo "No jobs were created, so there is nothing to do."
   rm $submitFile
   exit 0
@@ -812,10 +885,18 @@ elif [ -z "$NO_SUBMIT" ]; then
   # location on the execution node.
   unset X509_USER_PROXY
 
+  if [ -n "$OUTPUT_DAG_FILE" ]; then
+    wrapDag
+    submitCommand="condor_submit_dag -notification never"
+    submitFile="${OUTPUT_DAG_FILE}.wrapper"
+  else
+    submitCommand=condor_submit
+  fi
+
   # Convoluted way of sending a message to the screen
   # and to a log file about the sucess of submitting
   # jobs and then "die"ing if needed.
-  condor_submit $submitFile >> $farmoutLogFile
+  $submitCommand $submitFile >> $farmoutLogFile
   if [ $? -eq 1 ]; then
     echo "Failed to submit $submitFile" >> $farmoutLogFile
     die 
@@ -823,6 +904,18 @@ elif [ -z "$NO_SUBMIT" ]; then
     cat $farmoutLogFile
     echo "Date: "`date` >> $farmoutLogFile
   fi
+
+  if [ -n "$OUTPUT_DAG_FILE" ]; then
+    echo "You can monitor your workflow's progess by watching ${OUTPUT_DAG_FILE}.dagman.out"
+  fi
+
+  echo ""
+  echo "Your jobs should show up in ~6 minutes"
+  echo "at the NEW job monitoring web page :"
+  echo "    http://www.hep.wisc.edu/cms/comp/jobs/"
+
+elif [ -n "$OUTPUT_DAG_FILE" ]; then
+  echo "Submit DAG file $OUTPUT_DAG_FILE has been created but not submitted."
 else
   echo "Submit file $submitFile has been created but not submitted."
 fi
@@ -830,11 +923,3 @@ fi
 echo -n "Jobs for $jobName are created in "
 pwd
 cd $originalDir
-
-
-echo ""
-echo "Your jobs should show up in ~6 minutes"
-echo "at the NEW job monitoring web page :"
-echo "    http://www.hep.wisc.edu/cms/comp/jobs/"
-
-
