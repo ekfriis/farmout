@@ -25,7 +25,7 @@ The status of all of the jobs in this workflow can be found here:
 If your DAG workflow exited with a status other than 0, you can resubmit only
 the jobs that failed (and their dependencies) with the following command:
     
-    \$ condor_submit_dag ${OUTPUT_DAG_FILE}
+    \$ farmoutAnalysisJobs --rescue-dag-file ${OUTPUT_DAG_FILE}
 
 If some of the failed jobs are unrecoverable, you'll need to edit the DAG
 workflow file and mark the unrecoverable jobs 'NOOP'. If the jobs that depend on

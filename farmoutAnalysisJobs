@@ -185,6 +185,7 @@ PrintUsage() {
   echo "  --output-files-per-subdir=N (0 for infinite; 500 default)"
   echo "  --job-generates-output-name (don't try to control output file name)"
   echo "  --dbs-service-url=X         (global DBS by default)"
+  echo "  --rescue-dag-file=X"
   echo "  --output-dag-file=X"
   echo "  --last-submit-dir=X"
   echo ""
@@ -192,7 +193,7 @@ PrintUsage() {
   exit 2
 }
 
-OPTS=`getopt -o "h" -l "help,output-dir:,input-dir:,submit-dir:,no-submit,job-count:,skip-existing-output,skip-existing-jobs,match-input-files:,exclude-input-files:,input-files-per-job:,disk-requirements:,memory-requirements:,input-file-list:,input-dbs-path:,input-runs:,save-failed-datafiles,save-missing-input-file-list:,assume-input-files-exist,site-requirements:,quick-test,extra-inputs:,accounting-group:,requires-whole-machine,fwklite,output-files-per-subdir:,job-generates-output-name,dbs-service-url:,express-queue,vsize-limit:,merge,use-hadd,output-dag-file:,last-submit-dir:" -- "$@"`
+OPTS=`getopt -o "h" -l "help,output-dir:,input-dir:,submit-dir:,no-submit,job-count:,skip-existing-output,skip-existing-jobs,match-input-files:,exclude-input-files:,input-files-per-job:,disk-requirements:,memory-requirements:,input-file-list:,input-dbs-path:,input-runs:,save-failed-datafiles,save-missing-input-file-list:,assume-input-files-exist,site-requirements:,quick-test,extra-inputs:,accounting-group:,requires-whole-machine,fwklite,output-files-per-subdir:,job-generates-output-name,dbs-service-url:,express-queue,vsize-limit:,merge,use-hadd,rescue-dag-file:,output-dag-file:,last-submit-dir:" -- "$@"`
 if [ $? -ne 0 ]; then PrintUsage; fi
 
 eval set -- "$OPTS"
@@ -226,6 +227,7 @@ JOB_GENERATES_OUTPUT_NAME=0
 EXPRESS_QUEUE=0
 MERGE=
 USE_HADD=
+RESCUE_DAG_FILE=
 OUTPUT_DAG_FILE=
 LAST_SUBMIT_DIR=
 
@@ -265,6 +267,7 @@ do
     --express-queue) EXPRESS_QUEUE=1;;
     --merge) MERGE=1;;
     --use-hadd) USE_HADD=1;;
+    --rescue-dag-file) shift; RESCUE_DAG_FILE="$1";;
     --output-dag-file) shift; OUTPUT_DAG_FILE="$1";;
     --last-submit-dir) shift; LAST_SUBMIT_DIR="$1";;
 #    --use-hdfs)
@@ -299,17 +302,37 @@ if [ "$MERGE" != "1" ] && [ "$USE_HADD" = "1" ]; then
 fi
 
 # Check for some required utilities
-for exe in scramv1 condor_submit cmsRun.sh readlink voms-proxy-info ; do
+for exe in scramv1 condor_submit condor_submit_dag cmsRun.sh readlink voms-proxy-info ; do
   if ! which $exe >& /dev/null; then
     die "Cannot find $exe in PATH.  Your environment is not correctly set up."
   fi
 done
+
+submitDagCommand="condor_submit_dag -notification never"
+submitCommand=condor_submit
+
+if [ -n "$RESCUE_DAG_FILE" ]; then
+    if [ "$#" -gt 1 ]; then
+        die "You must not specify other arguments with --rescue-dag-file."
+    fi
+fi
 
 if [ "$MERGE" = "1" ]; then
   if [ "$#" -lt 2 ]; then PrintUsage; fi
   if [ "$INPUT_FILES_PER_JOB" -lt 2 ]; then
     die "You must specify --input-files-per-job=N with --merge."
   fi
+elif [ -n "$RESCUE_DAG_FILE" ]; then
+  dag=$(echo $RESCUE_DAG_FILE | sed -re 's/\.(rescue[0-9]{3}|wrapper).*//')
+  wrapper="${dag}.wrapper"
+  if [ ! -r "$wrapper" ]; then
+      die "Failed to find wrapper for DAG $dag"
+  elif [ ! -r "${dag}.rescue001" ]; then
+      die "Failed to rescue DAG $dag"
+  fi
+  echo "Submitting rescue for $dag"
+  $submitDagCommand "$wrapper" >> $farmoutLogFile
+  exit $?
 else
   if [ "$#" -lt 3 ]; then PrintUsage; fi
 fi
@@ -894,10 +917,8 @@ elif [ -z "$NO_SUBMIT" ]; then
 
   if [ -n "$OUTPUT_DAG_FILE" ]; then
     wrapDag
-    submitCommand="condor_submit_dag -notification never"
+    submitCommand="$submitDagCommand"
     submitFile="${OUTPUT_DAG_FILE}.wrapper"
-  else
-    submitCommand=condor_submit
   fi
 
   # Convoluted way of sending a message to the screen
