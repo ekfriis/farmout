@@ -865,6 +865,9 @@ cd $runDir
 # Wrap the real DAG with a thin outer DAG. The real DAG becomes a node with a
 # SCRIPT POST that will inform the user about the outcome of their workflow.
 wrapDag () {
+    cat <<EOF > ${OUTPUT_DAG_FILE}.config
+DAGMAN_MAX_SUBMIT_ATTEMPTS = 10
+EOF
     cat <<EOF > ${OUTPUT_DAG_FILE}.wrapper
 SUBDAG EXTERNAL farmout $OUTPUT_DAG_FILE
 SCRIPT POST farmout ${FARMOUT_HOME}/dag-wrapper.sh \$JOBID \$RETURN \
@@ -872,6 +875,10 @@ SCRIPT POST farmout ${FARMOUT_HOME}/dag-wrapper.sh \$JOBID \$RETURN \
     FARMOUT_USER=$FARMOUT_USER \
     USER=$USER \
     OUTPUT_DIR=${OUTPUT_DIR}
+EOF
+  cat <<EOF >> ${OUTPUT_DAG_FILE}
+NODE_STATUS_FILE ${OUTPUT_DAG_FILE}.status 60
+CONFIG ${OUTPUT_DAG_FILE}.config
 EOF
 }
 
@@ -907,6 +914,9 @@ elif [ -z "$NO_SUBMIT" ]; then
 
   if [ -n "$OUTPUT_DAG_FILE" ]; then
     echo "You can monitor your workflow's progess by watching ${OUTPUT_DAG_FILE}.dagman.out"
+    echo "A summary of the status of all of the jobs in your workflow will be"
+    echo "written to the following file every 60 seconds:"
+    echo "  ${OUTPUT_DAG_FILE}.status"
   fi
 
   echo ""

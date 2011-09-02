@@ -18,6 +18,10 @@ You can find the final output in:
 
     ${OUTPUT_DIR}
 
+The status of all of the jobs in this workflow can be found here:
+
+    ${OUTPUT_DAG_FILE}.status
+
 If your DAG workflow exited with a status other than 0, you can resubmit only
 the jobs that failed (and their dependencies) with the following command:
     
