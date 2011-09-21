@@ -362,7 +362,7 @@ fi
 dboard="
 dboard_taskId=${FARMOUT_USER}-`hostname -f`-\$(Cluster)
 dboard_jobId=\$(Process)
-dboard_sid=\$\$([GlobalJobId])
+dboard_sid=${FARMOUT_USER}-`hostname -f`-\$(Cluster).\$(Process)
 dboard_application=`basename ${CMSSW_HOME}`
 dboard_exe=cmsRun
 dboard_tool=farmout
