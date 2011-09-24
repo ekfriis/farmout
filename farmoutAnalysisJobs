@@ -331,7 +331,7 @@ elif [ -n "$RESCUE_DAG_FILE" ]; then
       die "Failed to rescue DAG $dag"
   fi
   echo "Submitting rescue for $dag"
-  $submitDagCommand "$wrapper" >> $farmoutLogFile
+  $submitDagCommand "$wrapper"
   exit $?
 else
   if [ "$#" -lt 3 ]; then PrintUsage; fi
