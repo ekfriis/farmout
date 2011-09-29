@@ -61,6 +61,12 @@ if [ -s "$tmpdir/errs" ]; then
     ) >> "$tmpdir/mail"
 fi
 
-mail -s "farmout DAG returned ${RETURN}" ${USER} < "$tmpdir/mail"
+if [ "${RETURN}" -eq 0 ]; then
+    completed="successfully"
+else [ "${RETURN}" -eq 1 ]; then
+    completed="with errors"
+else
+
+mail -s "farmout DAG completed $completed (${RETURN})" ${USER} < "$tmpdir/mail"
 
 exit ${RETURN}
