@@ -69,4 +69,6 @@ else
 
 mail -s "farmout DAG completed $completed (${RETURN})" ${USER} < "$tmpdir/mail"
 
+echo "$(date +%Y/%m%d %H:%M:%S) **** sent DAG notification to ${USER}" >> "${OUTPUT_DAG_FILE}.dagman.out"
+
 exit ${RETURN}
