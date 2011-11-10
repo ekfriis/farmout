@@ -493,7 +493,7 @@ if [ "$NO_SUBMIT" != 1 ] && ! check_proxy $MIN_PROXY_HOURS $proxy; then
   logerror "Either rerun this command with --no-submit or create a new grid proxy"
   logerror "and rerun this command.  Example of how to create a grid proxy:"
   logerror
-  logerror "voms-proxy-init --voms=cms --hours=48"
+  logerror "voms-proxy-init --voms=cms --valid=48:00"
   die
 fi
 

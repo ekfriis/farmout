@@ -252,7 +252,7 @@ if ! check_proxy $MIN_PROXY_HOURS $proxy; then
   logerror "You must create a new grid proxy"
   logerror "and rerun this command.  Example of how to create a grid proxy:"
   logerror
-  logerror "voms-proxy-init --voms=cms --hours=48"
+  logerror "voms-proxy-init --voms=cms --valid=48:00"
   exit 1
 fi
 
