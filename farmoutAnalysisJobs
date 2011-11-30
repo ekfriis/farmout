@@ -675,7 +675,7 @@ find_command="find ${LOCAL_INPUT_DIR} -size +0 -name $MATCH_INPUT_FILES $EXCLUDE
 
 dbs_query() {
     query="find file where"
-    for arg; do
+    for arg in $*; do
       query="$query $arg"
     done
     python $DBSCMD_HOME/dbsCommandLine.py -c search ${DBS_URL_ARG} --query="$query" | grep /store/
