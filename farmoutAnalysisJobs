@@ -35,7 +35,14 @@ PNFS_STORE=
 SRM_HOME=${SRM_SERVER}${PNFS_HOME}
 DCAP_HOME=${DCAP_SERVER}${PNFS_HOME}
 
-SITE_REQUIREMENTS='TARGET.Arch == "X86_64" && TARGET.HasAFS_OSG =?= True && TARGET.OSRedHatRelease =!= "Scientific Linux SL Release 3.0.4 (SL)" && IsSlowSlot=!=true'
+SITE_REQUIREMENTS='TARGET.Arch == "X86_64" && TARGET.HasAFS_OSG && IsSlowSlot=!=true'
+
+if echo "$PATH" | grep -q /cvmfs/cms.hep.wisc.edu; then
+  # require cvmfs to be available and at least as up to date as the local cvmfs
+  local_cvmfs_revision=`attr -q -g revision /cvmfs/cms.hep.wisc.edu`
+  SITE_REQUIREMENTS="${SITE_REQUIREMENTS} && TARGET.UWCMS_CVMFS_Exists && TARGET.UWCMS_CVMFS_Revision >= ${local_cvmfs_revision}"
+fi
+
 DISK_REQUIREMENTS=2000
 MEMORY_REQUIREMENTS=900
 VSIZE_LIMIT=3000
