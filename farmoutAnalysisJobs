@@ -186,6 +186,7 @@ PrintUsage() {
   echo "  --fwklite                (in this case, provide script instead of config)"
   echo "  --merge                     (merge input files; no cfg file expected)"
   echo "  --use-hadd                  (use hadd to merge files instead of mergeFiles.C)"
+  echo "  --infer-cmssw-path          (infer CMSSW path from environment)"
   echo "  --output-files-per-subdir=N (0 for infinite; 500 default)"
   echo "  --job-generates-output-name (don't try to control output file name)"
   echo "  --dbs-service-url=X         (global DBS by default)"
@@ -197,7 +198,7 @@ PrintUsage() {
   exit 2
 }
 
-OPTS=`getopt -o "h" -l "help,output-dir:,input-dir:,submit-dir:,no-submit,job-count:,skip-existing-output,skip-existing-jobs,match-input-files:,exclude-input-files:,input-files-per-job:,disk-requirements:,memory-requirements:,input-file-list:,input-dbs-path:,input-runs:,save-failed-datafiles,save-missing-input-file-list:,assume-input-files-exist,site-requirements:,quick-test,extra-inputs:,accounting-group:,requires-whole-machine,fwklite,output-files-per-subdir:,job-generates-output-name,dbs-service-url:,express-queue,vsize-limit:,merge,use-hadd,rescue-dag-file:,output-dag-file:,last-submit-dir:" -- "$@"`
+OPTS=`getopt -o "h" -l "help,output-dir:,input-dir:,submit-dir:,no-submit,job-count:,skip-existing-output,skip-existing-jobs,match-input-files:,exclude-input-files:,input-files-per-job:,disk-requirements:,memory-requirements:,input-file-list:,input-dbs-path:,input-runs:,save-failed-datafiles,save-missing-input-file-list:,assume-input-files-exist,site-requirements:,quick-test,extra-inputs:,accounting-group:,requires-whole-machine,fwklite,output-files-per-subdir:,job-generates-output-name,dbs-service-url:,infer-cmssw-path,express-queue,vsize-limit:,merge,use-hadd,rescue-dag-file:,output-dag-file:,last-submit-dir:" -- "$@"`
 if [ $? -ne 0 ]; then PrintUsage; fi
 
 eval set -- "$OPTS"
@@ -231,6 +232,7 @@ JOB_GENERATES_OUTPUT_NAME=0
 EXPRESS_QUEUE=0
 MERGE=
 USE_HADD=
+INFER_CMSSW_PATH=0
 RESCUE_DAG_FILE=
 OUTPUT_DAG_FILE=
 LAST_SUBMIT_DIR=
@@ -271,6 +273,7 @@ do
     --express-queue) EXPRESS_QUEUE=1;;
     --merge) MERGE=1;;
     --use-hadd) USE_HADD=1;;
+    --infer-cmssw-path) INFER_CMSSW_PATH=1;;
     --rescue-dag-file) shift; RESCUE_DAG_FILE="$1";;
     --output-dag-file) shift; OUTPUT_DAG_FILE="$1";;
     --last-submit-dir) shift; LAST_SUBMIT_DIR="$1";;
@@ -321,8 +324,13 @@ if [ -n "$RESCUE_DAG_FILE" ]; then
     fi
 fi
 
+nargs=3
+if [ "$INFER_CMSSW_PATH" -eq 1 ]; then
+  nargs=$(($nargs - 1))
+fi
+
 if [ "$MERGE" = "1" ]; then
-  if [ "$#" -lt 2 ]; then PrintUsage; fi
+  if [ "$#" -lt $(($nargs - 1)) ]; then PrintUsage; fi
   if [ "$INPUT_FILES_PER_JOB" -lt 2 ]; then
     die "You must specify --input-files-per-job=N with --merge."
   fi
@@ -338,7 +346,7 @@ elif [ -n "$RESCUE_DAG_FILE" ]; then
   $submitDagCommand "$wrapper"
   exit $?
 else
-  if [ "$#" -lt 3 ]; then PrintUsage; fi
+  if [ "$#" -lt $nargs ]; then PrintUsage; fi
 fi
 
 
@@ -346,8 +354,16 @@ fi
 
 jobName=$1
 shift
-CMSSW_HOME=`realpath $1`
-shift
+if [ ${INFER_CMSSW_PATH} -eq 0 ]; then
+  CMSSW_HOME=`realpath $1`
+  shift
+else
+  fail=
+  if [ -z "${CMSSW_BASE}" ]; then
+    die "--infer-cmssw-path is enabled but \$CMSSW_BASE is not set in the environment."
+  fi
+  CMSSW_HOME=`realpath $CMSSW_BASE/src`
+fi
 
 if [ "$MERGE" = "1" ]; then
   # In merge mode, we set a bunch of other options automatically,
