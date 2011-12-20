@@ -39,8 +39,13 @@ SITE_REQUIREMENTS='TARGET.Arch == "X86_64" && TARGET.HasAFS_OSG && IsSlowSlot=!=
 
 if echo "$PATH" | grep -q /cvmfs/cms.hep.wisc.edu; then
   # require cvmfs to be available and at least as up to date as the local cvmfs
+
+  SITE_REQUIREMENTS="${SITE_REQUIREMENTS} && TARGET.UWCMS_CVMFS_Exists"
+
   local_cvmfs_revision=`attr -q -g revision /cvmfs/cms.hep.wisc.edu`
-  SITE_REQUIREMENTS="${SITE_REQUIREMENTS} && TARGET.UWCMS_CVMFS_Exists && TARGET.UWCMS_CVMFS_Revision >= ${local_cvmfs_revision}"
+  if [ "$local_cvmfs_revision" != "" ]; then
+    SITE_REQUIREMENTS="${SITE_REQUIREMENTS} && TARGET.UWCMS_CVMFS_Revision >= ${local_cvmfs_revision}"
+  fi
 fi
 
 DISK_REQUIREMENTS=2000
