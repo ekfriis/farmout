@@ -79,7 +79,6 @@ realpath() {
   readlink -f $1
 }
 
-
 logerror() {
   echo 2>&1 "$@"
 }
@@ -187,6 +186,7 @@ PrintUsage() {
   echo "  --merge                     (merge input files; no cfg file expected)"
   echo "  --use-hadd                  (use hadd to merge files instead of mergeFiles.C)"
   echo "  --infer-cmssw-path          (infer CMSSW path from environment)"
+  echo "  --lumi-mask=X               (apply lumi mask json file)"
   echo "  --output-files-per-subdir=N (0 for infinite; 500 default)"
   echo "  --job-generates-output-name (don't try to control output file name)"
   echo "  --dbs-service-url=X         (global DBS by default)"
@@ -198,7 +198,7 @@ PrintUsage() {
   exit 2
 }
 
-OPTS=`getopt -o "h" -l "help,output-dir:,input-dir:,submit-dir:,no-submit,job-count:,skip-existing-output,skip-existing-jobs,match-input-files:,exclude-input-files:,input-files-per-job:,disk-requirements:,memory-requirements:,input-file-list:,input-dbs-path:,input-runs:,save-failed-datafiles,save-missing-input-file-list:,assume-input-files-exist,site-requirements:,quick-test,extra-inputs:,accounting-group:,requires-whole-machine,fwklite,output-files-per-subdir:,job-generates-output-name,dbs-service-url:,infer-cmssw-path,express-queue,vsize-limit:,merge,use-hadd,rescue-dag-file:,output-dag-file:,last-submit-dir:" -- "$@"`
+OPTS=`getopt -o "h" -l "help,output-dir:,input-dir:,submit-dir:,no-submit,job-count:,skip-existing-output,skip-existing-jobs,match-input-files:,exclude-input-files:,input-files-per-job:,disk-requirements:,memory-requirements:,input-file-list:,input-dbs-path:,input-runs:,save-failed-datafiles,save-missing-input-file-list:,assume-input-files-exist,site-requirements:,quick-test,extra-inputs:,accounting-group:,requires-whole-machine,fwklite,output-files-per-subdir:,job-generates-output-name,dbs-service-url:,infer-cmssw-path,lumi-mask:,express-queue,vsize-limit:,merge,use-hadd,rescue-dag-file:,output-dag-file:,last-submit-dir:" -- "$@"`
 if [ $? -ne 0 ]; then PrintUsage; fi
 
 eval set -- "$OPTS"
@@ -233,6 +233,7 @@ EXPRESS_QUEUE=0
 MERGE=
 USE_HADD=
 INFER_CMSSW_PATH=0
+LUMI_MASK=
 RESCUE_DAG_FILE=
 OUTPUT_DAG_FILE=
 LAST_SUBMIT_DIR=
@@ -274,6 +275,7 @@ do
     --merge) MERGE=1;;
     --use-hadd) USE_HADD=1;;
     --infer-cmssw-path) INFER_CMSSW_PATH=1;;
+    --lumi-mask) shift; LUMI_MASK=`realpath $1`;;
     --rescue-dag-file) shift; RESCUE_DAG_FILE="$1";;
     --output-dag-file) shift; OUTPUT_DAG_FILE="$1";;
     --last-submit-dir) shift; LAST_SUBMIT_DIR="$1";;
@@ -705,10 +707,22 @@ dbs_query() {
 }
 if [ "$INPUT_DBS_PATH" != "" ]; then
   query="dataset=$INPUT_DBS_PATH"
-  if [ "$INPUT_RUNS" != "" ]; then
-    query="$query and run in ($INPUT_RUNS)"
+  EXPANDED_INPUT_RUNS=$INPUT_RUNS
+  if [ "$EXPANDED_INPUT_RUNS" != "" ]; then
+    # Expand any ranges manually, DBS can't parse them
+    EXPANDED_INPUT_RUNS=`expandRunRange.py $EXPANDED_INPUT_RUNS`
+    query="$query and run in ($EXPANDED_INPUT_RUNS)"
   fi
   find_command="dbs_query $query"
+
+  # If we are applying a lumi mask, use a separate find command
+  if [ "$LUMI_MASK" != "" ]; then
+    find_command="dbsMaskFiles.py -v $INPUT_DBS_PATH $LUMI_MASK"
+    if [ "$INPUT_RUNS" != "" ]; then
+      find_command="$find_command --run-range=$INPUT_RUNS"
+    fi
+  fi
+
   check_input_file_existence=${ASSUME_INPUT_FILES_EXIST:-1}
   prepend_local_input_dir=1
 fi
