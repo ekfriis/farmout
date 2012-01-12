@@ -15,6 +15,12 @@
 # Job parameters
 #
 
+realpath() {
+  if ! [ -a "$1" ]; then
+    echo "$1"
+  fi
+  readlink -f $1
+}
 
 # Initialize default settings:
 FARMOUT_HOME=${FARMOUT_HOME:-$(dirname $(realpath $0))}
@@ -75,13 +81,6 @@ basename() {
     path=${path%$suffix}
   fi
   echo $path
-}
-
-realpath() {
-  if ! [ -a "$1" ]; then
-    echo "$1"
-  fi
-  readlink -f $1
 }
 
 logerror() {
