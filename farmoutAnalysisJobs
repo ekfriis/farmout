@@ -564,8 +564,11 @@ submitFile=$(incrfname "$submitFile")
 
 # If building a DAG, zero out the DAG input file if last-submit-dir is not
 # specified.
-if [ "$OUTPUT_DAG_FILE" != "" ] && [ "$LAST_SUBMIT_DIR" == "" ]; then
-    echo -n >| "$OUTPUT_DAG_FILE"
+if [ "$OUTPUT_DAG_FILE" != "" ]; then
+    OUTPUT_DAG_FILE=$(realpath "${OUTPUT_DAG_FILE}")
+    if [ "$LAST_SUBMIT_DIR" == "" ]; then
+        echo -n >| "$OUTPUT_DAG_FILE"
+    fi
 fi
 
 mkdir -p $runDir
