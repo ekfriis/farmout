@@ -16,10 +16,7 @@
 #
 
 realpath() {
-  if ! [ -a "$1" ]; then
-    echo "$1"
-  fi
-  readlink -f $1
+  readlink -f "$1"
 }
 
 # Initialize default settings:
