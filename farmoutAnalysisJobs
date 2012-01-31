@@ -194,13 +194,14 @@ PrintUsage() {
   echo "  --rescue-dag-file=X"
   echo "  --output-dag-file=X"
   echo "  --last-submit-dir=X"
+  echo "  --no-shared-fs              (send analysis binaries to execute machine)"
   echo "  --debug"
   echo ""
   echo "Note that <runName> is taken from the name of the config file."
   exit 2
 }
 
-OPTS=`getopt -o "h" -l "help,output-dir:,input-dir:,submit-dir:,no-submit,job-count:,skip-existing-output,skip-existing-jobs,match-input-files:,exclude-input-files:,input-files-per-job:,disk-requirements:,memory-requirements:,input-file-list:,input-dbs-path:,input-runs:,save-failed-datafiles,save-missing-input-file-list:,assume-input-files-exist,site-requirements:,quick-test,extra-inputs:,accounting-group:,requires-whole-machine,fwklite,output-files-per-subdir:,job-generates-output-name,dbs-service-url:,infer-cmssw-path,lumi-mask:,express-queue,vsize-limit:,merge,use-hadd,rescue-dag-file:,output-dag-file:,last-submit-dir:,debug" -- "$@"`
+OPTS=`getopt -o "h" -l "help,output-dir:,input-dir:,submit-dir:,no-submit,job-count:,skip-existing-output,skip-existing-jobs,match-input-files:,exclude-input-files:,input-files-per-job:,disk-requirements:,memory-requirements:,input-file-list:,input-dbs-path:,input-runs:,save-failed-datafiles,save-missing-input-file-list:,assume-input-files-exist,site-requirements:,quick-test,extra-inputs:,accounting-group:,requires-whole-machine,fwklite,output-files-per-subdir:,job-generates-output-name,dbs-service-url:,infer-cmssw-path,lumi-mask:,express-queue,vsize-limit:,merge,use-hadd,rescue-dag-file:,output-dag-file:,last-submit-dir:,no-shared-fs,debug" -- "$@"`
 if [ $? -ne 0 ]; then PrintUsage; fi
 
 eval set -- "$OPTS"
@@ -239,6 +240,7 @@ LUMI_MASK=
 RESCUE_DAG_FILE=
 OUTPUT_DAG_FILE=
 LAST_SUBMIT_DIR=
+NO_SHARED_FS=0
 DEBUG=
 
 while [ ! -z "$1" ]
@@ -282,6 +284,7 @@ do
     --rescue-dag-file) shift; RESCUE_DAG_FILE="$1";;
     --output-dag-file) shift; OUTPUT_DAG_FILE="$1";;
     --last-submit-dir) shift; LAST_SUBMIT_DIR="$1";;
+    --no-shared-fs) NO_SHARED_FS=1;;
     --debug) DEBUG=1;;
 #    --use-hdfs)
 #        SRM_SERVER=srm://cmshdfs01.hep.wisc.edu:8443/srm/v2/server?SFN=
@@ -373,7 +376,7 @@ else
   if [ -z "${CMSSW_BASE}" ]; then
     die "--infer-cmssw-path is enabled but \$CMSSW_BASE is not set in the environment."
   fi
-  CMSSW_HOME=`realpath $CMSSW_BASE/src`
+  CMSSW_HOME=`realpath $CMSSW_BASE`
 fi
 
 if [ "$MERGE" = "1" ]; then
@@ -623,8 +626,6 @@ dboard_taskType=analysis
 dboard_broker=local-condor-`hostname -f`
 dboard_user=${FARMOUT_USER}
 dboard_SyncCE=${CMS_DASHBOARD_LOCAL_CE}
-CMS_DASHBOARD_REPORTER=${CMS_DASHBOARD_REPORTER}
-FARMOUT_DASHBOARD_REPORTER=${FARMOUT_DASHBOARD_REPORTER}
 "
 # convert newlines to spaces
 dboard="`echo $dboard`"
@@ -671,13 +672,48 @@ if [ "$REQUIRES_WHOLE_MACHINE" == "1" ]; then
   SITE_REQUIREMENTS="${SITE_REQUIREMENTS} && TARGET.CAN_RUN_WHOLE_MACHINE && TARGET.TotalMemory*1024 >= MY.ImageSize && TARGET.Memory > 0 && TARGET.TotalDisk >= MY.DiskUsage && TARGET.Disk > 0"
 fi
 
+if [ "$NO_SHARED_FS" != 1 ]; then
+  do_getenv="true"
+  dboard="${dboard} CMS_DASHBOARD_REPORTER=${CMS_DASHBOARD_REPORTER}"
+  dboard="${dboard} FARMOUT_DASHBOARD_REPORTER=${FARMOUT_DASHBOARD_REPORTER}"
+else
+  do_getenv="false"
+
+  cmssw_env="DO_RUNTIME_CMSSW_SETUP=1"
+
+  if [ "$VO_CMS_SW_DIR" = "" ]; then
+    die "VO_CMS_SW_DIR is not defined"
+  fi
+  cmssw_env="$cmssw_env VO_CMS_SW_DIR=${VO_CMS_SW_DIR}"
+
+  if [ "$CMSSW_VERSION" = "" ]; then
+    die "CMSSW_VERSION is not defined"
+  fi
+  cmssw_env="$cmssw_env CMSSW_VERSION=${CMSSW_VERSION}"
+
+  cmssw_env="$cmssw_env SCRAM_ARCH=$(scramv1 arch)"
+
+  if [ "$EXTRA_INPUTS" != "" ]; then
+    EXTRA_INPUTS="${EXTRA_INPUTS},"
+  fi
+
+  EXTRA_INPUTS="${EXTRA_INPUTS}${CMSSW_HOME}/bin,${CMSSW_HOME}/lib"
+
+  if ! [ -z "${FARMOUT_DASHBOARD_REPORTER}" ] && ! [ -z "${CMS_DASHBOARD_REPORTER}" ]; then
+    dboard="${dboard} CMS_DASHBOARD_REPORTER=$(basename ${CMS_DASHBOARD_REPORTER})"
+    dboard="${dboard} FARMOUT_DASHBOARD_REPORTER=$(basename ${FARMOUT_DASHBOARD_REPORTER})"
+    EXTRA_INPUTS="${EXTRA_INPUTS},${FARMOUT_DASHBOARD_REPORTER},${CMS_DASHBOARD_REPORTER}"
+  fi
+
+fi
+
 # First put all the submit file commands that are the same for all jobs.
     cat <<EOF > $submitFile
 X509UserProxy        = ${proxy}
 Universe             = vanilla
 Executable           = $Executable
-GetEnv               = true
-Environment          = "${dboard} ${save_failed_datafiles_env} ${job_generates_output_name_env} ${fwklite_env} ${vsize_env}"
+GetEnv               = ${do_getenv}
+Environment          = "${dboard} ${save_failed_datafiles_env} ${job_generates_output_name_env} ${fwklite_env} ${vsize_env} ${cmssw_env}"
 Copy_To_Spool        = false
 Notification         = never
 WhenToTransferOutput = On_Exit

@@ -142,11 +142,12 @@ PrintUsage() {
   echo "  --output-files-per-subdir=N (0 for infinite; 500 default)"
   echo "  --pre-hook=<exe>            (call <exe> before the job runs)"
   echo "  --post-hook=<exe>           (call <exe> after the job runs)"
+  echo "  --no-shared-fs              (send analysis binaries to execute machine)"
   echo ""
   exit 2
 }
 
-OPTS=`getopt -o "h" -l "help,output-dir:,submit-dir:,no-submit,skip-existing-output,skip-existing-jobs,disk-requirements:,memory-requirements:,save-failed-datafiles,site-requirements:,quick-test,extra-inputs:,accounting-group:,requires-whole-machine,output-files-per-subdir:,vsize-limit:,pre-hook:,post-hook:" -- "$@"`
+OPTS=`getopt -o "h" -l "help,output-dir:,submit-dir:,no-submit,skip-existing-output,skip-existing-jobs,disk-requirements:,memory-requirements:,save-failed-datafiles,site-requirements:,quick-test,extra-inputs:,accounting-group:,requires-whole-machine,output-files-per-subdir:,vsize-limit:,pre-hook:,post-hook:,no-shared-fs" -- "$@"`
 if [ $? -ne 0 ]; then PrintUsage; fi
 
 eval set -- "$OPTS"
@@ -165,6 +166,7 @@ REQUIRES_WHOLE_MACHINE=
 OUTPUT_FILES_PER_SUBDIR=500
 FARMOUT_HOOK_PRERUN=
 FARMOUT_HOOK_POSTRUN=
+NO_SHARED_FS=0
 
 while [ ! -z "$1" ]
 do
@@ -188,6 +190,7 @@ do
     --output-files-per-subdir) shift; OUTPUT_FILES_PER_SUBDIR=$1;;
     --pre-hook) shift; FARMOUT_HOOK_PRERUN="$1";;
     --post-hook) shift; FARMOUT_HOOK_POSTRUN="$1";;
+    --no-shared-fs) NO_SHARED_FS=1;;
     --) shift; break;;
     *) die "Unexpected option $1";;
   esac
@@ -380,8 +383,6 @@ dboard_taskType=simulation
 dboard_broker=local-condor-`hostname -f`
 dboard_user=${FARMOUT_USER}
 dboard_SyncCE=${CMS_DASHBOARD_LOCAL_CE}
-CMS_DASHBOARD_REPORTER=${CMS_DASHBOARD_REPORTER}
-FARMOUT_DASHBOARD_REPORTER=${FARMOUT_DASHBOARD_REPORTER}
 "
 # convert newlines to spaces
 dboard="`echo $dboard`"
@@ -409,13 +410,48 @@ if [ "$VSIZE_LIMIT" != "" ]; then
   fi
 fi
 
+if [ "$NO_SHARED_FS" != 1 ]; then
+  do_getenv="true"
+  dboard="${dboard} CMS_DASHBOARD_REPORTER=${CMS_DASHBOARD_REPORTER}"
+  dboard="${dboard} FARMOUT_DASHBOARD_REPORTER=${FARMOUT_DASHBOARD_REPORTER}"
+else
+  do_getenv="false"
+
+  cmssw_env="DO_RUNTIME_CMSSW_SETUP=1"
+
+  if [ "$VO_CMS_SW_DIR" = "" ]; then
+    die "VO_CMS_SW_DIR is not defined"
+  fi
+  cmssw_env="$cmssw_env VO_CMS_SW_DIR=${VO_CMS_SW_DIR}"
+
+  if [ "$CMSSW_VERSION" = "" ]; then
+    die "CMSSW_VERSION is not defined"
+  fi
+  cmssw_env="$cmssw_env CMSSW_VERSION=${CMSSW_VERSION}"
+
+  cmssw_env="$cmssw_env SCRAM_ARCH=$(scramv1 arch)"
+
+  if [ "$EXTRA_INPUTS" != "" ]; then
+    EXTRA_INPUTS="${EXTRA_INPUTS},"
+  fi
+
+  EXTRA_INPUTS="${EXTRA_INPUTS}${CMSSW_HOME}/bin,${CMSSW_HOME}/lib"
+
+  if ! [ -z "${FARMOUT_DASHBOARD_REPORTER}" ] && ! [ -z "${CMS_DASHBOARD_REPORTER}" ]; then
+    dboard="${dboard} CMS_DASHBOARD_REPORTER=$(basename ${CMS_DASHBOARD_REPORTER})"
+    dboard="${dboard} FARMOUT_DASHBOARD_REPORTER=$(basename ${FARMOUT_DASHBOARD_REPORTER})"
+    EXTRA_INPUTS="${EXTRA_INPUTS},${FARMOUT_DASHBOARD_REPORTER},${CMS_DASHBOARD_REPORTER}"
+  fi
+
+fi
+
 # First put all the submit file commands that are the same for all jobs.
     cat <<EOF > $submitFile
 X509UserProxy        = ${proxy}
 Universe             = vanilla
 Executable           = $Executable
-GetEnv               = true
-Environment          = "${dboard} ${save_failed_datafiles_env} ${vsize_env}"
+GetEnv               = ${do_getenv}
+Environment          = "${dboard} ${save_failed_datafiles_env} ${vsize_env} ${cmssw_env}"
 Copy_To_Spool        = false
 Notification         = never
 WhenToTransferOutput = On_Exit

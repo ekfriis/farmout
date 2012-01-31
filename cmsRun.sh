@@ -34,7 +34,6 @@ ulimit -c 0
 # load environment for using srmcp
 source $OSG_SETUP
 
-
 dashboard_completion() {
   export dboard_ExeExitCode=$1
 
@@ -137,6 +136,49 @@ if outputFileExists $SRM_OUTPUT_FILE; then
   echo "File already exists: $SRM_OUTPUT_FILE; exiting as though successful."
   exit 0
 fi
+
+if [ "${DO_RUNTIME_CMSSW_SETUP}" = 1 ]; then
+    if ! [ -f "${VO_CMS_SW_DIR}/cmsset_default.sh" ]; then
+        if [ -f "${OSG_APP}/cmssoft/cms/cmsset_default.sh" ]; then
+            VO_CMS_SW_DIR="${OSG_APP}/cmssoft/cms/cmsset_default.sh"
+        else
+            echo "No such file ${VO_CMS_SW_DIR}/cmsset_default.sh"
+            exit 1
+        fi
+    fi
+    source "${VO_CMS_SW_DIR}/cmsset_default.sh"
+    scram=scramv1
+    if ! which $scram > /dev/null; then
+        echo "Cannot find $scram in PATH"
+        exit 1
+    fi
+
+    echo
+    echo "Setting up ${CMSSW_VERSION}"
+
+    if ! $scram project CMSSW "${CMSSW_VERSION}"; then
+        echo "Failed to set up local project area for CMSSW_VERSION ${CMSSW_VERSION}"
+        exit 1
+    fi
+    cd ${CMSSW_VERSION}
+
+    # copy in user analysis files
+    if ! cp -r ../bin ../lib .; then
+        echo "Failed to copy user analysis files"
+        exit 1
+    fi
+
+    eval `$scram runtime -sh`
+    cd ..
+    ls -l -R ${CMSSW_VERSION}/bin ${CMSSW_VERSION}/lib
+
+    echo "Done setting up ${CMSSW_VERSION}"
+    echo
+
+fi
+
+# in case dashboard reporter is in cwd
+export PATH="`pwd`:$PATH"
 
 if [ "${FARMOUT_DASHBOARD_REPORTER}" != "" ]; then
     ${FARMOUT_DASHBOARD_REPORTER} submission
