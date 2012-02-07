@@ -38,17 +38,20 @@ PNFS_STORE=
 SRM_HOME=${SRM_SERVER}${PNFS_HOME}
 DCAP_HOME=${DCAP_SERVER}${PNFS_HOME}
 
-SITE_REQUIREMENTS='TARGET.Arch == "X86_64" && TARGET.HasAFS_OSG && IsSlowSlot=!=true'
+# We need wisc AFS for wnclient unless running in OSG glidein
+SITE_REQUIREMENTS='TARGET.Arch == "X86_64" && ((MY.RequiresSharedFS=!=true && TARGET.IS_GLIDEIN=?=true) || TARGET.HasAFS_OSG) && IsSlowSlot=!=true'
 
 if echo "$PATH" | grep -q /cvmfs/cms.hep.wisc.edu; then
   # require cvmfs to be available and at least as up to date as the local cvmfs
 
-  SITE_REQUIREMENTS="${SITE_REQUIREMENTS} && TARGET.UWCMS_CVMFS_Exists"
+  SITE_REQUIREMENTS="${SITE_REQUIREMENTS} && (TARGET.HasParrotCVMFS=?=true || (TARGET.UWCMS_CVMFS_Exists"
 
   local_cvmfs_revision=`attr -q -g revision /cvmfs/cms.hep.wisc.edu`
   if [ "$local_cvmfs_revision" != "" ]; then
     SITE_REQUIREMENTS="${SITE_REQUIREMENTS} && TARGET.UWCMS_CVMFS_Revision >= ${local_cvmfs_revision}"
   fi
+
+  SITE_REQUIREMENTS="${SITE_REQUIREMENTS} ))"
 fi
 
 DISK_REQUIREMENTS=2000
@@ -195,13 +198,15 @@ PrintUsage() {
   echo "  --output-dag-file=X"
   echo "  --last-submit-dir=X"
   echo "  --no-shared-fs              (send analysis binaries to execute machine)"
+  echo "  --use-osg                   (allow jobs to run opportunistically on OSG)"
+  echo "  --use-only-osg              (only run jobs opportunistically on OSG)"
   echo "  --debug"
   echo ""
   echo "Note that <runName> is taken from the name of the config file."
   exit 2
 }
 
-OPTS=`getopt -o "h" -l "help,output-dir:,input-dir:,submit-dir:,no-submit,job-count:,skip-existing-output,skip-existing-jobs,match-input-files:,exclude-input-files:,input-files-per-job:,disk-requirements:,memory-requirements:,input-file-list:,input-dbs-path:,input-runs:,save-failed-datafiles,save-missing-input-file-list:,assume-input-files-exist,site-requirements:,quick-test,extra-inputs:,accounting-group:,requires-whole-machine,fwklite,output-files-per-subdir:,job-generates-output-name,dbs-service-url:,infer-cmssw-path,lumi-mask:,express-queue,vsize-limit:,merge,use-hadd,rescue-dag-file:,output-dag-file:,last-submit-dir:,no-shared-fs,debug" -- "$@"`
+OPTS=`getopt -o "h" -l "help,output-dir:,input-dir:,submit-dir:,no-submit,job-count:,skip-existing-output,skip-existing-jobs,match-input-files:,exclude-input-files:,input-files-per-job:,disk-requirements:,memory-requirements:,input-file-list:,input-dbs-path:,input-runs:,save-failed-datafiles,save-missing-input-file-list:,assume-input-files-exist,site-requirements:,quick-test,extra-inputs:,accounting-group:,requires-whole-machine,fwklite,output-files-per-subdir:,job-generates-output-name,dbs-service-url:,infer-cmssw-path,lumi-mask:,express-queue,vsize-limit:,merge,use-hadd,rescue-dag-file:,output-dag-file:,last-submit-dir:,no-shared-fs,use-osg,use-only-osg,debug" -- "$@"`
 if [ $? -ne 0 ]; then PrintUsage; fi
 
 eval set -- "$OPTS"
@@ -241,6 +246,7 @@ RESCUE_DAG_FILE=
 OUTPUT_DAG_FILE=
 LAST_SUBMIT_DIR=
 NO_SHARED_FS=0
+USE_OSG=0
 DEBUG=
 
 while [ ! -z "$1" ]
@@ -285,6 +291,8 @@ do
     --output-dag-file) shift; OUTPUT_DAG_FILE="$1";;
     --last-submit-dir) shift; LAST_SUBMIT_DIR="$1";;
     --no-shared-fs) NO_SHARED_FS=1;;
+    --use-osg) NO_SHARED_FS=1; USE_OSG=1;;
+    --use-only-osg) NO_SHARED_FS=1; USE_OSG=1; SITE_REQUIREMENTS="${SITE_REQUIREMENTS} && TARGET.IS_GLIDEIN";;
     --debug) DEBUG=1;;
 #    --use-hdfs)
 #        SRM_SERVER=srm://cmshdfs01.hep.wisc.edu:8443/srm/v2/server?SFN=
@@ -320,6 +328,10 @@ fi
 
 if [ "$MERGE" != "1" ] && [ "$USE_HADD" = "1" ]; then
   die "The option --use-hadd requires --merge"
+fi
+
+if [ "$USE_OSG" = "1" ]; then
+  WANT_GLIDEIN="+WantGlidein = true"
 fi
 
 # Check for some required utilities
@@ -674,10 +686,12 @@ fi
 
 if [ "$NO_SHARED_FS" != 1 ]; then
   do_getenv="true"
+  requires_shared_fs="true"
   dboard="${dboard} CMS_DASHBOARD_REPORTER=${CMS_DASHBOARD_REPORTER}"
   dboard="${dboard} FARMOUT_DASHBOARD_REPORTER=${FARMOUT_DASHBOARD_REPORTER}"
 else
   do_getenv="false"
+  requires_shared_fs="false"
 
   cmssw_env="DO_RUNTIME_CMSSW_SETUP=1"
 
@@ -713,6 +727,11 @@ X509UserProxy        = ${proxy}
 Universe             = vanilla
 Executable           = $Executable
 GetEnv               = ${do_getenv}
+# tell glideins to run job with access to cvmfs (via parrot)
++RequiresCVMFS       = True
+# for reference by our own requirements expression
++RequiresSharedFS    = ${requires_shared_fs}
+${WANT_GLIDEIN}
 Environment          = "${dboard} ${save_failed_datafiles_env} ${job_generates_output_name_env} ${fwklite_env} ${vsize_env} ${cmssw_env}"
 Copy_To_Spool        = false
 Notification         = never
