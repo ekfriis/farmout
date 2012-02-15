@@ -465,6 +465,8 @@ X509UserProxy        = ${proxy}
 Universe             = vanilla
 Executable           = $Executable
 GetEnv               = ${do_getenv}
+# tell glideins to run job with access to cvmfs (via parrot)
++RequiresCVMFS       = True
 # for reference by our own requirements expression
 +RequiresSharedFS    = ${requires_shared_fs}
 ${WANT_GLIDEIN}
