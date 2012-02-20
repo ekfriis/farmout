@@ -160,13 +160,16 @@ if [ "${DO_RUNTIME_CMSSW_SETUP}" = 1 ]; then
         echo "Failed to set up local project area for CMSSW_VERSION ${CMSSW_VERSION}"
         exit 1
     fi
-    cd ${CMSSW_VERSION}
 
     # copy in user analysis files
-    if ! cp -r ../bin ../lib .; then
-        echo "Failed to copy user analysis files"
-        exit 1
+    if [ "${CMSSW_USER_CODE_TGZ}" != "" ]; then
+        if ! tar xzf "${CMSSW_USER_CODE_TGZ}" -C "${CMSSW_VERSION}"; then
+            echo "Failed to extract ${CMSSW_USER_CODE_TGZ}"
+            exit 1
+        fi
     fi
+
+    cd ${CMSSW_VERSION}
 
     eval `$scram runtime -sh`
     cd ..

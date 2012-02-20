@@ -122,6 +122,24 @@ check_proxy() {
 
 }
 
+packUserCode() {
+  local release_area="$1"
+  local tgz="$2"
+
+  local saved_wd="$(pwd)"
+  cd "$release_area" || die "Failed to access $release_area"
+
+  # Include src/*/python directories, because python/ contains
+  # symlinks to to it that must remain symlinks, due to code that
+  # relies on its location within the src tree.
+  # Also include src/*/data, because these may be needed.
+  local src_files="$(find src -type d -name python -o -name data)"
+
+  tar czf "$tgz" bin lib python $src_files || die "Failed to make $tgz"
+
+  cd "$saved_wd" || die "Failed to access $saved_wd"
+}
+
 PrintUsage() {
   echo "USAGE: farmoutRandomSeedJobs [options] <jobName> <events> <events-per-job> <CMSSW Path> <config files> [extra-cmsRun-args]"
   echo ""
@@ -348,6 +366,7 @@ done
 OUTPUT_DIR=${OUTPUT_DIR:-${SRM_HOME}/$jobName}
 SUBMIT_DIR=${SUBMIT_DIR:-${SUBMIT_HOME}/$jobName}
 submitFile=$SUBMIT_DIR/submit
+userCodeTgz=$SUBMIT_DIR/user_code.tgz
 farmoutLogFile=$SUBMIT_DIR/farmoutRandomSeedJobs.log
 
 if [ -d "$SUBMIT_DIR" ] && [ "$SKIP_EXISTING_JOBS" != "1" ]; then
@@ -449,7 +468,9 @@ else
     EXTRA_INPUTS="${EXTRA_INPUTS},"
   fi
 
-  EXTRA_INPUTS="${EXTRA_INPUTS}${CMSSW_HOME}/bin,${CMSSW_HOME}/lib"
+  cmssw_env="$cmssw_env CMSSW_USER_CODE_TGZ=$(basename $userCodeTgz)"
+  packUserCode "${CMSSW_HOME}" "$userCodeTgz"
+  EXTRA_INPUTS="${EXTRA_INPUTS}${userCodeTgz}"
 
   if ! [ -z "${FARMOUT_DASHBOARD_REPORTER}" ] && ! [ -z "${CMS_DASHBOARD_REPORTER}" ]; then
     dboard="${dboard} CMS_DASHBOARD_REPORTER=$(basename ${CMS_DASHBOARD_REPORTER})"
