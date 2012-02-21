@@ -45,19 +45,18 @@ dashboard_completion() {
 outputFileExists() {
   local srm_fname="$1"
 
-  local info="`srmls -retry_num=0 $srm_fname 2>/dev/null`"
+  local info="`lcg-ls -l -bD srmv2 $srm_fname 2>/dev/null`"
   if [ "$?" != "0" ]; then
     return 1
   fi
-  IFS=$' :\t'
-  local size="`echo \"$info\" | ( read size name; echo $size )`"
-  unset IFS
+  local size="`echo \"$info\" | awk '{print $5}'`"
   if [ "$size" != "0" ] && [ "$size" != "" ]; then
+    echo "$info"
     return 0
   fi
   if [ "$size" = "0" ]; then
     echo "Cleaning up zero-length destination file $srm_fname."
-    srmrm -debug=true -retry_num=0 "$srm_fname"
+    lcg-del -l -bD srmv2 "$srm_fname"
   fi
   return 1
 }
@@ -116,11 +115,11 @@ DoSrmcp() {
 
       if outputFileExists "$dest"; then
          echo "Cleaning up failed destination file $dest."
-         srmrm -debug=true -retry_num=0 "$dest"
+         lcg-del -l -bD srmv2 "$dest"
 
          rc=$?
          if [ "$rc" != "0" ]; then
-           echo "srmrm failed with exit status $rc at `date`."
+           echo "lcg-del failed with exit status $rc at `date`."
          fi
       fi
 
