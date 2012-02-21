@@ -65,6 +65,9 @@ MIN_PROXY_HOURS=24
 # so the interactive osg app volume is not pounded by the jobs.
 SITE_ENV_MATCH_REPLACE_1='s|/afs/hep.wisc.edu/osg/app_[^/]*/|/afs/hep.wisc.edu/osg/app/|g'
 
+# special exit status to force job to leave the queue
+FAIL_JOB=42
+
 for scratch_dir in /data /scratch /tmp; do
   if [ -d $scratch_dir ] && [ -w $scratch_dir ]; then
     break
@@ -757,6 +760,7 @@ Environment          = "${dboard} ${save_failed_datafiles_env} ${job_generates_o
 Copy_To_Spool        = false
 Notification         = never
 WhenToTransferOutput = On_Exit
+on_exit_remove       = (ExitBySignal == FALSE && (ExitCode == 0 || (ExitCode == ${FAIL_JOB} && NumJobStarts>3))) || (NumJobStarts>6)
 ${QUEUE_ATTRIBUTE}
 ImageSize            = $(($MEMORY_REQUIREMENTS*1024))
 +DiskUsage           = $(($DISK_REQUIREMENTS*1024))
