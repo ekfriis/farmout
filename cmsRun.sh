@@ -301,9 +301,18 @@ if [ "$cmsRun_rc" != "0" ]; then
 
   dashboard_completion $cmsRun_rc
 
-  # Do not try to run this job again.  Would be nice to detect transient
-  # errors (e.g. dCache down) and retry in those cases.
-  exit $FAIL_JOB
+  if [ "$cmsRun_rc" = "65" ]; then
+    # We have seen this error caused by timeouts in connecting to frontier,
+    # so try the job again.
+    exit 0
+  elif ! touch intermediate/touch_test; then
+    # The local disk appears to be messed up, so try the job again.
+    echo "Failed to touch a file in the sandbox."
+    exit 0
+  else
+    # Do not try to run this job again.
+    exit $FAIL_JOB
+  fi
 fi
 
 if [ -n "${FARMOUT_HOOK_POSTRUN}" ]; then
