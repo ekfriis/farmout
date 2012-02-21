@@ -505,6 +505,7 @@ ${IS_FAST_QUEUE_JOB}
 Requirements         = ${SITE_REQUIREMENTS} && TARGET.Memory > ${MEMORY_REQUIREMENTS}
 # stop jobs from running if they blow up
 periodic_hold        = DiskUsage/1024 > ${HOLD_DISK_USAGE_FACTOR}*${DISK_REQUIREMENTS}
+job_ad_information_attrs = MachineAttrGLIDEIN_Site0,MachineAttrName0
 ${ACCOUNTING_GROUP}
 ${REQUIRES_WHOLE_MACHINE_ATTR}
 EOF
