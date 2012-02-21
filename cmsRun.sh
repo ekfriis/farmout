@@ -1,6 +1,10 @@
 #!/bin/sh
 #
 
+start_time=`date "+%s"`
+user_time=0
+sys_time=0
+
 jobcfgs=$1
 shift
 datafile=$1
@@ -130,6 +134,16 @@ DoSrmcp() {
     return 1
 }
 
+exitSlowly() {
+    local total_runtime=$((`date "+%s"` -  $start_time))
+    if [ "$total_runtime" -lt 300 ]; then
+        date
+        echo "Waiting before exiting to avoid the possibility of rapid job failure on this node."
+        sleep 300
+        date
+    fi
+    exit "$1"
+}
 
 if outputFileExists $SRM_OUTPUT_FILE; then
   echo "File already exists: $SRM_OUTPUT_FILE; exiting as though successful."
@@ -142,14 +156,14 @@ if [ "${DO_RUNTIME_CMSSW_SETUP}" = 1 ]; then
             VO_CMS_SW_DIR="${OSG_APP}/cmssoft/cms/cmsset_default.sh"
         else
             echo "No such file ${VO_CMS_SW_DIR}/cmsset_default.sh"
-            exit 1
+            exitSlowly 1
         fi
     fi
     source "${VO_CMS_SW_DIR}/cmsset_default.sh"
     scram=scramv1
     if ! which $scram > /dev/null; then
         echo "Cannot find $scram in PATH"
-        exit 1
+        exitSlowly 1
     fi
 
     echo
@@ -157,14 +171,14 @@ if [ "${DO_RUNTIME_CMSSW_SETUP}" = 1 ]; then
 
     if ! $scram project CMSSW "${CMSSW_VERSION}"; then
         echo "Failed to set up local project area for CMSSW_VERSION ${CMSSW_VERSION}"
-        exit 1
+        exitSlowly 1
     fi
 
     # copy in user analysis files
     if [ "${CMSSW_USER_CODE_TGZ}" != "" ]; then
         if ! tar xzf "${CMSSW_USER_CODE_TGZ}" -C "${CMSSW_VERSION}"; then
             echo "Failed to extract ${CMSSW_USER_CODE_TGZ}"
-            exit 1
+            exitSlowly 1
         fi
     fi
 
@@ -224,10 +238,6 @@ fi
 
 ulimit -a
 echo
-
-start_time=`date "+%s"`
-user_time=0
-sys_time=0
 
 cmsRun=cmsRun
 
@@ -304,14 +314,14 @@ if [ "$cmsRun_rc" != "0" ]; then
   if [ "$cmsRun_rc" = "65" ]; then
     # We have seen this error caused by timeouts in connecting to frontier,
     # so try the job again.
-    exit 1
+    exitSlowly 1
   elif ! touch intermediate/touch_test; then
     # The local disk appears to be messed up, so try the job again.
     echo "Failed to touch a file in the sandbox."
-    exit 1
+    exitSlowly 1
   else
     # Do not try to run this job again.
-    exit $FAIL_JOB
+    exitSlowly $FAIL_JOB
   fi
 fi
 
@@ -328,14 +338,14 @@ fi
 if [ "$JOB_GENERATES_OUTPUT_NAME" != 1 ]; then
   if ! [ -f $datafile ]; then
     echo "$cmsRun did not produce expected datafile $datafile"
-    exit $FAIL_JOB
+    exitSlowly $FAIL_JOB
   fi
 
   if [ "$SRM_OUTPUT_DIR" != "" ]; then
     if ! DoSrmcp "$datafile" "$SRM_OUTPUT_FILE"; then
       dashboard_completion 60307
       rm -f *.root
-      exit 1
+      exitSlowly 1
     fi
 
     rm $datafile
@@ -349,7 +359,7 @@ if [ "$SRM_OUTPUT_DIR" != "" ]; then
       if ! DoSrmcp $file $SRM_OUTPUT_DIR/$file; then
           dashboard_completion 60307
           rm -f *.root
-	  exit 1
+	  exitSlowly 1
       fi
       rm $file
   done
