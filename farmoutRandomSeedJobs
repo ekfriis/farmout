@@ -17,6 +17,7 @@
 # $outputFileName
 
 # Initialize default settings:
+FARMOUT_HOME=${FARMOUT_HOME:-$(dirname $(realpath $0))}
 
 # for storing output
 FARMOUT_USER=${FARMOUT_USER:-${USER}}
@@ -398,12 +399,12 @@ fi
 #
 # CMS Dashboard parameters
 #
-FARMOUT_DASHBOARD_REPORTER=`which farmout_dashboard.sh 2>/dev/null`
-if [ "$FARMOUT_DASHBOARD_REPORTER" = "" ]; then
-   echo "No farmout_dashboard.sh found, so no reporting to the CMS dashboard."
-fi
-if [ "$CMS_DASHBOARD_REPORTER" = "" ]; then
-   echo "No CMS_DASHBOARD_REPORTER defined, so no reporting to the CMS dashboard."
+CMS_DASHBOARD_REPORTER_TGZ="${FARMOUT_HOME}/cmsdashboard_reporter.tgz"
+FARMOUT_DASHBOARD_REPORTER="${FARMOUT_HOME}/farmout_dashboard.sh"
+if ! [ -x "$FARMOUT_DASHBOARD_REPORTER" ] || ! [ -a "$CMS_DASHBOARD_REPORTER_TGZ" ]; then
+   echo "No farmout_dashboard.sh or cmsdashboard_reporter.tgz found, so no reporting to the CMS dashboard."
+   FARMOUT_DASHBOARD_REPORTER=""
+   CMS_DASHBOARD_REPORTER_TGZ=""
 fi
 dboard="
 dboard_taskId=${FARMOUT_USER}-`hostname -f`-\$(Cluster)
@@ -447,7 +448,7 @@ fi
 if [ "$NO_SHARED_FS" != 1 ]; then
   do_getenv="true"
   requires_shared_fs="true"
-  dboard="${dboard} CMS_DASHBOARD_REPORTER=${CMS_DASHBOARD_REPORTER}"
+  dboard="${dboard} CMS_DASHBOARD_REPORTER_TGZ=${CMS_DASHBOARD_REPORTER_TGZ}"
   dboard="${dboard} FARMOUT_DASHBOARD_REPORTER=${FARMOUT_DASHBOARD_REPORTER}"
 else
   do_getenv="false"
@@ -475,10 +476,10 @@ else
   packUserCode "${CMSSW_HOME}" "$userCodeTgz"
   EXTRA_INPUTS="${EXTRA_INPUTS}${userCodeTgz}"
 
-  if ! [ -z "${FARMOUT_DASHBOARD_REPORTER}" ] && ! [ -z "${CMS_DASHBOARD_REPORTER}" ]; then
-    dboard="${dboard} CMS_DASHBOARD_REPORTER=$(basename ${CMS_DASHBOARD_REPORTER})"
+  if ! [ -z "${FARMOUT_DASHBOARD_REPORTER}" ]; then
+    dboard="${dboard} CMS_DASHBOARD_REPORTER_TGZ=$(basename ${CMS_DASHBOARD_REPORTER_TGZ})"
     dboard="${dboard} FARMOUT_DASHBOARD_REPORTER=$(basename ${FARMOUT_DASHBOARD_REPORTER})"
-    EXTRA_INPUTS="${EXTRA_INPUTS},${FARMOUT_DASHBOARD_REPORTER},${CMS_DASHBOARD_REPORTER}"
+    EXTRA_INPUTS="${EXTRA_INPUTS},${FARMOUT_DASHBOARD_REPORTER},${CMS_DASHBOARD_REPORTER_TGZ}"
   fi
 
 fi

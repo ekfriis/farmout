@@ -150,6 +150,14 @@ if outputFileExists $SRM_OUTPUT_FILE; then
   exit 0
 fi
 
+if [ "${CMS_DASHBOARD_REPORTER_TGZ}" != "" ]; then
+    if ! tar xzf "${CMS_DASHBOARD_REPORTER_TGZ}"; then
+        echo "WARNING: failed to untar ${CMS_DASHBOARD_REPORTER_TGZ}"
+    else
+        export CMS_DASHBOARD_REPORTER=$(basename "${CMS_DASHBOARD_REPORTER_TGZ}" .tgz)
+    fi
+fi
+
 if [ "${DO_RUNTIME_CMSSW_SETUP}" = 1 ]; then
     if ! [ -f "${VO_CMS_SW_DIR}/cmsset_default.sh" ]; then
         if [ -f "${OSG_APP}/cmssoft/cms/cmsset_default.sh" ]; then
