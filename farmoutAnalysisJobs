@@ -38,8 +38,8 @@ PNFS_STORE=
 SRM_HOME=${SRM_SERVER}${PNFS_HOME}
 DCAP_HOME=${DCAP_SERVER}${PNFS_HOME}
 
-# We need wisc AFS for wnclient unless running in OSG glidein
-SITE_REQUIREMENTS='TARGET.Arch == "X86_64" && ((MY.RequiresSharedFS=!=true && TARGET.IS_GLIDEIN=?=true) || TARGET.HasAFS_OSG) && IsSlowSlot=!=true'
+# We need wisc AFS for accing user CMSSW release area unless in no-shared-fs mode
+SITE_REQUIREMENTS='TARGET.Arch == "X86_64" && ((MY.RequiresSharedFS=!=true && TARGET.IS_GLIDEIN=?=true) || TARGET.HasAFS_OSG && TARGET.OSG_major =!= undefined) && IsSlowSlot=!=true'
 
 if echo "$PATH" | grep -q /cvmfs/cms.hep.wisc.edu; then
   # require cvmfs to be available and at least as up to date as the local cvmfs

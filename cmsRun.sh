@@ -22,6 +22,8 @@ fi
 
 if [ "$OSG_GRID" != "" ]; then
   OSG_SETUP=$OSG_GRID/setup.sh
+elif [ -e /etc/osg/wn-client/setup.sh ]; then
+  OSG_SETUP=/etc/osg/wn-client/setup.sh
 else
   OSG_SETUP=/afs/hep.wisc.edu/osg/wnclient/setup.sh
 fi
@@ -35,7 +37,7 @@ SRM_TIMEOUT=3600
 # so disable them.
 ulimit -c 0
 
-# load environment for using srmcp
+# load environment for using lcg-cp
 source $OSG_SETUP
 
 dashboard_completion() {
@@ -213,6 +215,8 @@ fi
 mkdir intermediate
 
 echo "Running on host `hostname`"
+echo "uname: " `uname -a`
+echo "/etc/issue: " `cat /etc/issue`
 echo "Current working directory: `pwd`"
 echo "df `pwd`"
 df .
