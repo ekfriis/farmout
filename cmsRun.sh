@@ -22,6 +22,9 @@ fi
 
 if [ "$OSG_GRID" != "" ]; then
   OSG_SETUP=$OSG_GRID/setup.sh
+elif [ -e /afs/hep.wisc.edu/osg/wnclient/setup.sh ]; then
+  # temporarily use AFS wnclient instead of local rpm wnclient, because of problem with lcg-cp failing
+  OSG_SETUP=/afs/hep.wisc.edu/osg/wnclient/setup.sh
 elif [ -e /etc/osg/wn-client/setup.sh ]; then
   OSG_SETUP=/etc/osg/wn-client/setup.sh
 else
