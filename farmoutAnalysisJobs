@@ -125,6 +125,12 @@ outputFileExists() {
   return 1
 }
 
+jobFailed() {
+  ulog=$1
+
+  $FARMOUT_HOME/CondorUserLog.py --job-failed $ulog >/dev/null
+}
+
 find_dag_inputs() {
     find "$LAST_SUBMIT_DIR" -type f -name submit -print0 | xargs -r0 \
         sed -nre "s|^# DAG_OUTPUT_FILENAME (.*)|${DCAP_SERVER}\1|p"
@@ -190,6 +196,7 @@ PrintUsage() {
   echo "  --no-submit"
   echo "  --job-count=N            (limit the number of jobs that are created)"
   echo "  --input-files-per-job=1"
+  echo "  --resubmit-failed-jobs"
   echo "  --skip-existing-output   (do not create jobs if output file exists)"
   echo "  --skip-existing-jobs     (do not create jobs if job already created)"
   echo "  --match-input-files='*.root'"
@@ -227,7 +234,7 @@ PrintUsage() {
   exit 2
 }
 
-OPTS=`getopt -o "h" -l "help,output-dir:,input-dir:,submit-dir:,no-submit,job-count:,skip-existing-output,skip-existing-jobs,match-input-files:,exclude-input-files:,input-files-per-job:,disk-requirements:,memory-requirements:,input-file-list:,input-dbs-path:,input-runs:,save-failed-datafiles,save-missing-input-file-list:,assume-input-files-exist,site-requirements:,quick-test,extra-inputs:,accounting-group:,requires-whole-machine,fwklite,output-files-per-subdir:,job-generates-output-name,dbs-service-url:,infer-cmssw-path,lumi-mask:,express-queue,vsize-limit:,merge,use-hadd,rescue-dag-file:,output-dag-file:,last-submit-dir:,no-shared-fs,use-osg,use-only-osg,debug" -- "$@"`
+OPTS=`getopt -o "h" -l "help,output-dir:,input-dir:,submit-dir:,no-submit,job-count:,skip-existing-output,skip-existing-jobs,match-input-files:,exclude-input-files:,input-files-per-job:,disk-requirements:,memory-requirements:,input-file-list:,input-dbs-path:,input-runs:,save-failed-datafiles,save-missing-input-file-list:,assume-input-files-exist,site-requirements:,quick-test,extra-inputs:,accounting-group:,requires-whole-machine,fwklite,output-files-per-subdir:,job-generates-output-name,dbs-service-url:,infer-cmssw-path,lumi-mask:,express-queue,vsize-limit:,merge,use-hadd,rescue-dag-file:,output-dag-file:,last-submit-dir:,no-shared-fs,use-osg,use-only-osg,debug,resubmit-failed-jobs" -- "$@"`
 if [ $? -ne 0 ]; then PrintUsage; fi
 
 eval set -- "$OPTS"
@@ -238,6 +245,7 @@ NO_SUBMIT=
 JOB_LIMIT=
 SKIP_EXISTING_OUTPUT=
 SKIP_EXISTING_JOBS=
+RESUBMIT_FAILED_JOBS=
 OUTPUT_DIR=
 INPUT_DIR=
 SUBMIT_DIR=
@@ -279,6 +287,7 @@ do
     --job-count) shift; JOB_LIMIT=$1;;
     --skip-existing-output) SKIP_EXISTING_OUTPUT=1;;
     --skip-existing-jobs) SKIP_EXISTING_JOBS=1;;
+    --resubmit-failed-jobs) RESUBMIT_FAILED_JOBS=1;;
     --output-dir) shift; OUTPUT_DIR=$1;;
     --input-dir) shift; INPUT_DIR=$1;;
     --submit-dir) shift; SUBMIT_DIR=$1;;
@@ -547,12 +556,13 @@ if ! [ -d "$CMSSW_HOME" ]; then
   die "Error: No such CMSSW directory: $CMSSW_HOME"
 fi
 
-if [ -d "$SUBMIT_DIR" ] && [ "$SKIP_EXISTING_JOBS" != "1" ]; then
+if [ -d "$SUBMIT_DIR" ] && [ "$SKIP_EXISTING_JOBS" != "1" ] && [ "$RESUBMIT_FAILED_JOBS" != "1" ]; then
   logerror
   logerror "Error: Submit directory already exists: $SUBMIT_DIR"
   logerror
-  logerror "You must either remove it, or specify --skip-existing-jobs, or"
-  logerror "specify a different job name or submission directory with --submit-dir"
+  logerror "You must either remove it, or specify --resubmit-failed-jobs or "
+  logerror "--skip-existing-jobs, or specify a different job name or "
+  logerror "submission directory with --submit-dir"
   die
 fi
 
@@ -923,6 +933,15 @@ do
     if [ "$SKIP_EXISTING_OUTPUT" = "1" ]; then
       # Check for existing output file
       if outputFileExists $job_output_dir/$outputFileName; then
+        continue
+      fi
+    fi
+
+    if [ "$RESUBMIT_FAILED_JOBS" = "1" ]; then
+      # Check for existing failed job
+      if [ -a $jobtag/$conlog ] && jobFailed $jobtag/$conlog; then
+        echo "Resubmitting failed job $jobtag"
+      else
         continue
       fi
     fi
