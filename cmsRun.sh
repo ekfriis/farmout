@@ -221,6 +221,10 @@ echo "Current working directory: `pwd`"
 echo "df `pwd`"
 df .
 
+# in some environments, our stdout/stderr are not readable by others,
+# which makes monitoring a pain when the file are transferred back
+chmod a+r '*.out' '*.err'
+
 if [ -n "${FARMOUT_HOOK_PRERUN}" ]; then
     if [ ! -x "${FARMOUT_HOOK_PRERUN}" ]; then
         echo "farmout: prerun hook ${FARMOUT_HOOK_PRERUN} is not executable"

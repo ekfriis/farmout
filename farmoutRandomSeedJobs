@@ -63,6 +63,11 @@ for scratch_dir in /data /scratch /tmp; do
 done
 SUBMIT_HOME=${scratch_dir}/${FARMOUT_USER}
 
+SHARED_LOGS=${scratch_dir}/farmout_logs
+mkdir -p -m a+rwx $SHARED_LOGS
+SHARED_LOGS=$SHARED_LOGS/${FARMOUT_USER}
+mkdir -p $SHARED_LOGS
+
 logerror() {
   echo 2>&1 "$@"
 }
@@ -385,6 +390,8 @@ fi
 mkdir -p $SUBMIT_DIR
 cd $SUBMIT_DIR || die "Failed to create directory $SUBMIT_DIR"
 
+SHARED_LOGS=$SHARED_LOGS/$(basename $SUBMIT_DIR)
+mkdir -p $SHARED_LOGS
 
 #
 # Job specification
@@ -661,6 +668,11 @@ EOF
 # Prepare for the next job
 #
     let nEventsSubmitted=$nEventsSubmitted+$nEventsPerJob
+
+    touch $stdout $stderr $conlog
+    ln -f $stdout $SHARED_LOGS/$stdout
+    ln -f $stderr $SHARED_LOGS/$stderr
+    ln -f $conlog $SHARED_LOGS/$conlog
 
 done
 

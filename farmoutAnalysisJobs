@@ -75,6 +75,11 @@ for scratch_dir in /data /scratch /tmp; do
 done
 SUBMIT_HOME=${scratch_dir}/${FARMOUT_USER}
 
+SHARED_LOGS=${scratch_dir}/farmout_logs
+mkdir -p -m a+rwx $SHARED_LOGS
+SHARED_LOGS=$SHARED_LOGS/${FARMOUT_USER}
+mkdir -p $SHARED_LOGS
+
 basename() {
   # This shell function is faster than calling /bin/basename
   path=$1
@@ -616,8 +621,10 @@ if [ "$OUTPUT_DAG_FILE" != "" ]; then
 fi
 
 mkdir -p $runDir
-
 cd $runDir || die "Failed to create directory $runDir"
+
+SHARED_LOGS=$SHARED_LOGS/$(basename $runDir)
+mkdir -p $SHARED_LOGS
 
 #
 # Job specification
@@ -1020,6 +1027,12 @@ EOF
     if [ "$OUTPUT_DAG_FILE" != "" ]; then
         echo "# DAG_OUTPUT_FILENAME ${job_output_dir#${SRM_SERVER}}/$outputFileName" >> $jobSubmitFile
     fi
+
+    touch $stdout $stderr $conlog
+    ln -f $stdout $SHARED_LOGS/$stdout
+    ln -f $stderr $SHARED_LOGS/$stderr
+    ln -f $conlog $SHARED_LOGS/$conlog
+
 done || die
 
 echo ""
