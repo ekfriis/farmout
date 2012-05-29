@@ -223,7 +223,7 @@ df .
 
 # in some environments, our stdout/stderr are not readable by others,
 # which makes monitoring a pain when the file are transferred back
-chmod a+r '*.out' '*.err'
+chmod a+r *.out *.err
 
 if [ -n "${FARMOUT_HOOK_PRERUN}" ]; then
     if [ ! -x "${FARMOUT_HOOK_PRERUN}" ]; then
