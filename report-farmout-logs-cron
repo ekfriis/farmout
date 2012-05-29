@@ -1,0 +1,19 @@
+#!/bin/sh
+
+MAILTO=dan@hep.wisc.edu
+FARMOUT_LOGS=/scratch/farmout_logs
+FARMOUT_HOME=/cms/cmsprod/farmoutCmsJobs
+
+REPORT=/tmp/report-farmout-logs-cron.$$
+
+yesterday=$((`date "+%s"` - 3600*24))
+$FARMOUT_HOME/analyze_condor_userlogs --ended-after=$yesterday $FARMOUT_LOGS > $REPORT
+
+if [ -s $REPORT ]; then
+  mail -s "Daily Farmout Report" $MAILTO < $REPORT
+fi
+
+rm -f $REPORT
+
+chown root:root $FARMOUT_LOGS
+tmpwatch -umc 72 $FARMOUT_LOGS
