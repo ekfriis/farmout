@@ -6,7 +6,7 @@ import getopt
 import os
 import re
 
-def FindLogs(paths,match_logs,exclude_logs,logs=None):
+def FindLogs(paths,match_logs,exclude_logs,ended_after=None,logs=None):
 	if logs == None:
 		logs = []
 
@@ -14,13 +14,14 @@ def FindLogs(paths,match_logs,exclude_logs,logs=None):
 		basename = os.path.basename(path)
 		if os.path.isfile(path):
 			if match_logs.match(basename) and not exclude_logs.match(basename):
-				logs.append(path)
+				if ended_after is None or ended_after < os.path.getmtime(path):
+					logs.append(path)
 		elif os.path.islink(path):
 			# avoid possibility of link loops by not following links to dirs
 			pass
 		elif os.path.isdir(path):
 			contents = [ os.path.join(path,x) for x in os.listdir(path) ]
-			FindLogs(contents,match_logs,exclude_logs,logs)
+			FindLogs(contents,match_logs,exclude_logs,ended_after,logs)
 
 	return logs
 
@@ -49,6 +50,7 @@ long_options = [
 	"help",
 	"match-logs=",
 	"exclude-logs=",
+	"ended-after=",
 ]
 
 options,args = getopt.getopt(sys.argv[1:],"h",long_options)
@@ -56,6 +58,7 @@ options,args = getopt.getopt(sys.argv[1:],"h",long_options)
 # these defaults work well for farmout logs
 match_logs = re.compile(".*\\.log")
 exclude_logs = re.compile("((report)|(farmoutRandomSeedJobs)|(farmoutAnalysisJobs)).log")
+ended_after = None
 
 for option,value in options:
 	if option == "-h" or option == "--help":
@@ -65,7 +68,9 @@ for option,value in options:
 		match_logs=re.compile(value)
 	if option == "--exclude-logs":
 		exclude_logs=re.compile(value)
+	if option == "--ended-after":
+		ended_after=long(value)
 
-logs = FindLogs(args,match_logs,exclude_logs)
+logs = FindLogs(args,match_logs,exclude_logs,ended_after=ended_after)
 
 AnalyzeLogs(logs)
