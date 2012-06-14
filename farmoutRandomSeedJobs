@@ -669,10 +669,10 @@ EOF
 #
     let nEventsSubmitted=$nEventsSubmitted+$nEventsPerJob
 
-    touch $stdout $stderr $conlog
-    ln -f $stdout $SHARED_LOGS/$stdout
-    ln -f $stderr $SHARED_LOGS/$stderr
-    ln -f $conlog $SHARED_LOGS/$conlog
+    touch $jobtag/$stdout $jobtag/$stderr $jobtag/$conlog
+    ln -f $jobtag/$stdout $SHARED_LOGS/$stdout
+    ln -f $jobtag/$stderr $SHARED_LOGS/$stderr
+    ln -f $jobtag/$conlog $SHARED_LOGS/$conlog
 
 done
 
