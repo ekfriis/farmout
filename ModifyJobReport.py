@@ -51,15 +51,6 @@ def fileSize(filename):
 	"""
 	return os.stat(filename)[6]	
 
-def CopyFile(src,dest):
-	if src.find("dcap:") < 0:
-		raise "Expected dcap URL, not " + src
-
-	command = "dccp " + src + " " + dest
-	rc = os.system(command)
-	if rc:
-		raise "Failed to make local copy of " + src
-
 def addFileStats(file):
 	"""
 	_addFileStats_
@@ -70,16 +61,10 @@ def addFileStats(file):
 
 	pfn = file['PFN']
 
-	local_pfn = os.path.join(tmp_file_path,"for_fjr." + str(os.getpid()))
-	if os.path.exists(local_pfn):
-		os.unlink(local_pfn)
-	CopyFile(pfn,local_pfn)
-
-	file['Size'] = fileSize(local_pfn)
-	checkSum = readCksum(local_pfn)
+	file['Size'] = fileSize(pfn)
+	checkSum = readCksum(pfn)
 	file.addChecksum('cksum',checkSum)
 
-	os.unlink(local_pfn)
 	return
 
 def ShowUsage():
@@ -194,8 +179,14 @@ if __name__ == '__main__':
 	# code for parsing FJRs.
 
 	for f in report.files:
-		f['LFN'] = os.path.join(lfn_path,f['PFN'])
-		f['PFN'] = os.path.join(pfn_path,f['PFN'])
+		fname = f['PFN']
+		if not os.path.exists(os.path.join(pfn_path,fname)):
+			for i in range(1,100):
+				if os.path.exists(os.path.join(pfn_path,str(i),fname)):
+					fname = os.path.join(str(i),fname)
+					break
+		f['PFN'] = os.path.join(pfn_path,fname)
+		f['LFN'] = os.path.join(lfn_path,fname)
 		f['SEName'] = SEName
 
 		#Generate per file stats

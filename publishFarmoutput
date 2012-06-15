@@ -1,28 +1,30 @@
 #!/bin/sh
 
+# DBS environment setup suitable for use with Wisconsin DBS server
+. /cvmfs/cms.hep.wisc.edu/osg/app/cmssoft/cms/slc5_ia32_gcc434/cms/dbs-client/DBS_2_0_9_patch_4-cms8/etc/profile.d/init.sh
+
+#DBS_URL=https://cmsdbsprod.cern.ch:8443/cms_dbs_prod_local_01_writer/servlet/DBSServlet
+DBS_URL=http://honey.hep.wisc.edu:8080/DBS/servlet/DBSServlet
+
+
 # CRAB environment setup
 
 export PYTHONPATH=
-export PATH=/cms/sw/python-2.5/bin:$PATH
+#export PATH=/cms/sw/python-2.5/bin:$PATH
 #source /cms/sw/CRAB_2_3_1/crab.sh
-source /cms/sw/CRAB_2_4_3/crab.sh
+#source /cms/sw/CRAB_2_4_3/crab.sh
 
-# Initialize default settings:
+source /cms/sw/CRAB_2_7_2_p1/crab.sh
 
-DBS_URL=https://cmsdbsprod.cern.ch:8443/cms_dbs_prod_local_01_writer/servlet/DBSServlet
+# I failed to use CRAB versions from 2_7_4 and on, because they
+# depend on some sqlite Boss db that doesn't exist for farmout jobs
+#source /cms/sw/CRAB_2_8_1/crab.sh
 
 # for storing output
-SRM_SERVER=srm://cmssrm.hep.wisc.edu:8443
 SEName=cmssrm.hep.wisc.edu
-PNFS_HOME=/pnfs/hep.wisc.edu/store/user/$USER
 
 # for getting input
-DCAP_SERVER=dcap://cmsdcap.hep.wisc.edu:22125
-# path to directory containing lfns: /store/...
-PNFS_STORE=/pnfs/hep.wisc.edu
-
-SRM_HOME=${SRM_SERVER}/${PNFS_HOME}
-DCAP_HOME=${DCAP_SERVER}${PNFS_HOME}
+STORE_USER_URL=/hdfs/store/user/$USER
 
 MIN_PROXY_HOURS=24
 
@@ -94,11 +96,11 @@ check_proxy() {
 }
 
 PrintUsage() {
-  echo "USAGE: publishFarmoutput [options] <jobName> <CMSSW Ver> <config file>"
+  echo "USAGE: publishFarmoutput [options] <jobName> <CMSSW Ver>"
   echo ""
   echo "OPTIONS:"
   echo "  --dbs-url=${DBS_URL} (default is OSG local DBS)"
-  echo "  --output-dir=${DCAP_HOME}/<jobName>"
+  echo "  --output-dir=${STORE_USER_URL}/<jobName>"
   echo "  --submit-dir=${SUBMIT_HOME}/<jobName>"
   echo "  --PrimaryDataset=<jobName>"
   echo "  --ProcessedDataset=name"
@@ -206,7 +208,7 @@ do
   shift
 done
 
-if [ "$#" -ne 3 ]; then PrintUsage; fi
+if [ "$#" -ne 2 ]; then PrintUsage; fi
 
 
 # Check for some required utilities
@@ -220,14 +222,16 @@ done
 
 jobName=$1
 ApplicationVersion=`basename $2`
-configTemplate=`realpath $3`
+
+OUTPUT_DIR=${OUTPUT_DIR:-${STORE_USER_URL}/$jobName}
+SUBMIT_DIR=${SUBMIT_DIR:-${SUBMIT_HOME}/$jobName}
+LFN_DIR=/store/${OUTPUT_DIR#*/store/}
+
+# choose one of the job config files to represent the config file for the whole set
+configTemplate=`find ${SUBMIT_DIR} -name '*.py' | sort | head -1`
 
 CFG_EXTENSION="${configTemplate/*./}"
 runName=`basename $configTemplate .${CFG_EXTENSION}`
-
-OUTPUT_DIR=${OUTPUT_DIR:-${DCAP_HOME}/$jobName}
-SUBMIT_DIR=${SUBMIT_DIR:-${SUBMIT_HOME}/$jobName}
-LFN_DIR=/store/${OUTPUT_DIR#*/store/}
 
 FARMOUT_HOME=`realpath $0`
 if ! [ -f "${FARMOUT_HOME}" ]; then

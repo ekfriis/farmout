@@ -1,5 +1,5 @@
 import Publisher
-import crab_logger
+import CrabLogger
 import WorkSpace
 import os
 import sys
@@ -14,6 +14,7 @@ long_options = [
 # config params for CRAB
 cfg_params = {}
 cfg_params["USER.copy_data"] = 1
+cfg_params["USER.publish_data"] = 1
 cfg_params["CMSSW.datasetpath"] = "NONE"
 cfg_params["CMSSW.dataset_pu"] = None
 
@@ -30,7 +31,8 @@ for option,value in options:
 
 # initialize some global stuff the CRAB publisher depends on
 Publisher.common.work_space = WorkSpace.WorkSpace(os.getcwd(),cfg_params)
-Publisher.common.logger = crab_logger.Logger()
+Publisher.common.debugLevel = 0
+Publisher.common.logger = CrabLogger.CrabLogger(args)
 Publisher.common.logger.debug_level = 6
 
 p = Publisher.Publisher(cfg_params)
