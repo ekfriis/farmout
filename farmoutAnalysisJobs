@@ -205,6 +205,7 @@ PrintUsage() {
   echo "  --skip-existing-output   (do not create jobs if output file exists)"
   echo "  --skip-existing-jobs     (do not create jobs if job already created)"
   echo "  --match-input-files='*.root'"
+  echo "  --clean-crab-dupes       (filter duplicate output files from CRAB)"
   echo "  --exclude-input-files=pattern"
   echo "  --input-file-list=file"
   echo "  --memory-requirements=$MEMORY_REQUIREMENTS (megabytes)"
@@ -239,7 +240,7 @@ PrintUsage() {
   exit 2
 }
 
-OPTS=`getopt -o "h" -l "help,output-dir:,input-dir:,submit-dir:,no-submit,job-count:,skip-existing-output,skip-existing-jobs,match-input-files:,exclude-input-files:,input-files-per-job:,disk-requirements:,memory-requirements:,input-file-list:,input-dbs-path:,input-runs:,save-failed-datafiles,save-missing-input-file-list:,assume-input-files-exist,site-requirements:,quick-test,extra-inputs:,accounting-group:,requires-whole-machine,fwklite,output-files-per-subdir:,job-generates-output-name,dbs-service-url:,infer-cmssw-path,lumi-mask:,express-queue,vsize-limit:,merge,use-hadd,rescue-dag-file:,output-dag-file:,last-submit-dir:,no-shared-fs,use-osg,use-only-osg,debug,resubmit-failed-jobs" -- "$@"`
+OPTS=`getopt -o "h" -l "help,output-dir:,input-dir:,submit-dir:,no-submit,job-count:,skip-existing-output,skip-existing-jobs,match-input-files:,exclude-input-files:,clean-crab-dupes,input-files-per-job:,disk-requirements:,memory-requirements:,input-file-list:,input-dbs-path:,input-runs:,save-failed-datafiles,save-missing-input-file-list:,assume-input-files-exist,site-requirements:,quick-test,extra-inputs:,accounting-group:,requires-whole-machine,fwklite,output-files-per-subdir:,job-generates-output-name,dbs-service-url:,infer-cmssw-path,lumi-mask:,express-queue,vsize-limit:,merge,use-hadd,rescue-dag-file:,output-dag-file:,last-submit-dir:,no-shared-fs,use-osg,use-only-osg,debug,resubmit-failed-jobs" -- "$@"`
 if [ $? -ne 0 ]; then PrintUsage; fi
 
 eval set -- "$OPTS"
@@ -255,6 +256,7 @@ OUTPUT_DIR=
 INPUT_DIR=
 SUBMIT_DIR=
 MATCH_INPUT_FILES='*.root'
+CLEAN_CRAB_DUPES=0
 EXCLUDE_INPUT_FILES=
 INPUT_FILES_PER_JOB=1
 INPUT_FILE_LIST=
@@ -298,6 +300,7 @@ do
     --submit-dir) shift; SUBMIT_DIR=$1;;
     --match-input-files) shift; MATCH_INPUT_FILES=$1;;
     --exclude-input-files) shift; EXCLUDE_INPUT_FILES=$1;;
+    --clean-crab-dupes) CLEAN_CRAB_DUPES=1;;
     --input-files-per-job) shift; INPUT_FILES_PER_JOB=$1;;
     --disk-requirements) shift; DISK_REQUIREMENTS=$1;;
     --memory-requirements) shift; MEMORY_REQUIREMENTS=$1;;
@@ -808,6 +811,14 @@ fi
 
 find_command="find ${LOCAL_INPUT_DIR} -size +0 -name $MATCH_INPUT_FILES $EXCLUDE_ARG"
 
+# This filters nothing.
+filter_command="cat"
+
+# Pipe through the filter script
+if [ "$CLEAN_CRAB_DUPES" -eq 1 ]; then
+  filter_command="clean_crab_duplicates.py"
+fi
+
 dbs_query() {
     query="find file where"
     for arg in $*; do
@@ -848,7 +859,7 @@ fi
 
 count=0
 output_file_count=0
-$find_command |
+$find_command | $filter_command | 
 while read nextInputFile
 do
     inputFileNames=""
