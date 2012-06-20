@@ -816,7 +816,7 @@ filter_command="cat"
 
 # Pipe through the filter script
 if [ "$CLEAN_CRAB_DUPES" -eq 1 ]; then
-  filter_command="$FARMOUT_HOME/clean_crab_duplicates.py"
+  filter_command="${FARMOUT_HOME}/clean_crab_duplicates.py"
 fi
 
 dbs_query() {
