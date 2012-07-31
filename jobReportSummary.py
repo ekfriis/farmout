@@ -32,7 +32,7 @@ class RunLumiCorruptionError(Exception):
     '''
     def __init__(self, job_report, input_run_info, output_run_info):
         super(RunLumiCorruptionError, self).__init__(
-            job_report, intput_run_info, output_run_info)
+            job_report, input_run_info, output_run_info)
 
         self.job_report = job_report
         self.input_run_info = input_run_info
@@ -42,8 +42,8 @@ class RunLumiCorruptionError(Exception):
 
         self.n_missing_run_lumis = len(self.missing_run_lumis)
         self.n_extra_lumis = len(self.extra_lumis)
-        self.extra_lumis = " ".join("%i:%i" % x for x in extra_lumis),
-        self.missing_run_lumis = " ".join("%i:%i" % x for x in missing_run_lumis),
+        self.extra_lumis = " ".join("%i:%i" % x for x in self.extra_lumis),
+        self.missing_run_lumis = " ".join("%i:%i" % x for x in self.missing_run_lumis),
 
     def __str__(self):
         return ("In job report %(job_report)s:\n"
@@ -135,9 +135,9 @@ def parse_job_report(fd):
             )
 
     # Do some sanity checks
-    if output['output_run_lumis'] != output['input_run_lumis']:
-        raise RunLumiCorruptionError(
-            filename, output['input_run_lumis'], output['output_run_lumis'])
+    #if output['output_run_lumis'] != output['input_run_lumis']:
+        #raise RunLumiCorruptionError(
+            #filename, output['input_run_lumis'], output['output_run_lumis'])
 
     # Return info dictionary
     return output
@@ -461,7 +461,7 @@ def main():
         lumis=len(result['input_run_lumis']),
         min_run=min(x[0] for x in result['input_run_lumis']),
         max_run=max(x[0] for x in result['input_run_lumis']),
-        writesperfile=result['events_written']*1./len(result['output_files']),
+        writesperfile=result['events_written']*1./max(len(result['output_files']), 1),
         skim_eff=result['events_written']*100.0/result['events_read'],
     ))
     report = [
