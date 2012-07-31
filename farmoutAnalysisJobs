@@ -831,14 +831,14 @@ if [ "$INPUT_DBS_PATH" != "" ]; then
   EXPANDED_INPUT_RUNS=$INPUT_RUNS
   if [ "$EXPANDED_INPUT_RUNS" != "" ]; then
     # Expand any ranges manually, DBS can't parse them
-    EXPANDED_INPUT_RUNS=`expandRunRange.py $EXPANDED_INPUT_RUNS`
+    EXPANDED_INPUT_RUNS=`${FARMOUT_HOME}/expandRunRange.py $EXPANDED_INPUT_RUNS`
     query="$query and run in ($EXPANDED_INPUT_RUNS)"
   fi
   find_command="dbs_query $query"
 
   # If we are applying a lumi mask, use a separate find command
   if [ "$LUMI_MASK" != "" ]; then
-    find_command="dbsMaskFiles.py -v $INPUT_DBS_PATH $LUMI_MASK"
+    find_command="${FARMOUT_HOME}/dbsMaskFiles.py -v $INPUT_DBS_PATH $LUMI_MASK"
     if [ "$INPUT_RUNS" != "" ]; then
       find_command="$find_command --run-range=$INPUT_RUNS"
     fi
