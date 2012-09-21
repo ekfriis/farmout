@@ -379,6 +379,22 @@ then
   die "The option --job-generates-output-name conflicts with --skip-existing-output"
 fi
 
+if [ "$SKIP_EXISTING_OUTPUT" = "1" ] && [ "$OUTPUT_DAG_FILE" != "" ]; then
+  die "The option --output-dag-file conflicts with --skip-existing-output"
+fi
+
+if [ "$RESUBMIT_FAILED_JOBS" = "1" ] && [ "$OUTPUT_DAG_FILE" != "" ]; then
+  die "The option --output-dag-file conflicts with --resubmit-failed-jobs.  Perhaps you want to use --rescue-dag-file instead?"
+fi
+
+if [ "$SKIP_EXISTING_OUTPUT" = "1" ] && [ "$RESUBMIT_FAILED_JOBS" = "1" ]; then
+  echo "NOTE: both --skip-existing-output and --resubmit-failed-jobs were specified, so only jobs that have no existing output AND which exited with non-zero status will be submitted."
+fi
+
+if [ "$SKIP_EXISTING_JOBS" = "1" ] && [ "$RESUBMIT_FAILED_JOBS" = "1" ]; then
+  die "--skip-existing-jobs conflicts with --resubmit-failed-jobs"
+fi
+
 if [ "$MERGE" != "1" ] && [ "$USE_HADD" = "1" ]; then
   die "The option --use-hadd requires --merge"
 fi
