@@ -564,12 +564,15 @@ if ! [ -d "$CMSSW_HOME" ]; then
   die "Error: No such CMSSW directory: $CMSSW_HOME"
 fi
 
-if [ -d "$SUBMIT_DIR" ] && [ "$SKIP_EXISTING_JOBS" != "1" ] && [ "$RESUBMIT_FAILED_JOBS" != "1" ]; then
+if [ -d "$SUBMIT_DIR" ] && [ "$SKIP_EXISTING_JOBS" != "1" ] && [ "$RESUBMIT_FAILED_JOBS" != "1" ] && [ "$SKIP_EXISTING_OUTPUT" != "1" ]; then
   logerror
   logerror "Error: Submit directory already exists: $SUBMIT_DIR"
   logerror
-  logerror "You must either remove it, or specify --resubmit-failed-jobs or "
-  logerror "--skip-existing-jobs, or specify a different job name or "
+  logerror "You must either remove it, or specify one of the following options:"
+  logerror "  --resubmit-failed-jobs"
+  logerror "  --skip-existing-jobs"
+  logerror "  --skip-existing-output"
+  logerror "or specify a different job name or "
   logerror "submission directory with --submit-dir"
   die
 fi
