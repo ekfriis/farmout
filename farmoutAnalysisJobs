@@ -116,15 +116,30 @@ incrfname () {
 }
 
 outputFileExists() {
-  fname=$1
+  local fname=$1
 
   #Strip off srm://hostname:8443 to get raw path.
-  local_fname=${fname#srm://*:8443}
+  local local_fname=${fname#srm://*:8443}
 
   #Strip off '/blah/blah?SFN='
   local_fname=${local_fname#*SFN=}
 
   if [ -f "$local_fname" ]; then
+    return 0
+  fi
+  return 1
+}
+
+outputDirExists() {
+  local fname=$1
+
+  #Strip off srm://hostname:8443 to get raw path.
+  local local_fname=${fname#srm://*:8443}
+
+  #Strip off '/blah/blah?SFN='
+  local_fname=${local_fname#*SFN=}
+
+  if [ -d "$local_fname" ]; then
     return 0
   fi
   return 1
@@ -860,6 +875,15 @@ elif [ "$LAST_SUBMIT_DIR" != "" ]; then
   check_input_file_existence=0
 fi
 
+job_output_search_dirs="$OUTPUT_DIR"
+if [ "$OUTPUT_DIR" != "." ] && [ "$SKIP_EXISTING_OUTPUT" = 1 ]; then
+    subdir=1
+    while outputDirExists "$OUTPUT_DIR/$subdir"; do
+        job_output_search_dirs="$job_output_search_dirs $OUTPUT_DIR/$subdir"
+        subdir=$(($subdir+1))
+    done
+fi
+
 count=0
 output_file_count=0
 $find_command | $filter_command | 
@@ -947,15 +971,26 @@ do
     cd $runDir || die "Failed to cd to $runDir"
 
 
-    if [ "$SKIP_EXISTING_JOBS" = "1" ] && [ -d $jobtag ]; then
-      continue
+    if [ "$SKIP_EXISTING_JOBS" = "1" ]; then
+      if [ -d $jobtag ]; then
+        continue
+      fi
+      echo "Job $jobtag did not exist."
     fi
 
     if [ "$SKIP_EXISTING_OUTPUT" = "1" ]; then
       # Check for existing output file
-      if outputFileExists $job_output_dir/$outputFileName; then
+      found=0
+      for search_dir in $job_output_search_dirs; do
+        if outputFileExists $search_dir/$outputFileName; then
+          found=1
+          break
+        fi
+      done
+      if [ "$found" = 1 ]; then
         continue
       fi
+      echo "Output file $outputFileName did not exist."
     fi
 
     if [ "$RESUBMIT_FAILED_JOBS" = "1" ]; then
