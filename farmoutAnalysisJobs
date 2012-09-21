@@ -60,6 +60,7 @@ VSIZE_LIMIT=3000
 HOLD_IMAGE_SIZE_FACTOR=4.0
 HOLD_DISK_USAGE_FACTOR=10.0
 MIN_PROXY_HOURS=24
+OUTPUT_FILES_PER_SUBDIR=0
 
 # We want explicit references to "app_rw" to be replaced with "app"
 # so the interactive osg app volume is not pounded by the jobs.
@@ -240,7 +241,7 @@ PrintUsage() {
   echo "  --use-hadd                  (use hadd to merge files instead of mergeFiles.C)"
   echo "  --infer-cmssw-path          (infer CMSSW path from environment)"
   echo "  --lumi-mask=X               (apply lumi mask json file)"
-  echo "  --output-files-per-subdir=N (0 for infinite; 500 default)"
+  echo "  --output-files-per-subdir=N (0 for infinite; $OUTPUT_FILES_PER_SUBDIR default)"
   echo "  --job-generates-output-name (don't try to control output file name)"
   echo "  --dbs-service-url=X         (global DBS by default)"
   echo "  --rescue-dag-file=X"
@@ -286,7 +287,6 @@ EXTRA_INPUTS=
 REQUIRES_WHOLE_MACHINE=
 FWKLITE=
 APPLICATION=cmsRun
-OUTPUT_FILES_PER_SUBDIR=500
 JOB_GENERATES_OUTPUT_NAME=0
 EXPRESS_QUEUE=0
 MERGE=

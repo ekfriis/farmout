@@ -48,6 +48,7 @@ VSIZE_LIMIT=3000
 HOLD_IMAGE_SIZE_FACTOR=4.0
 HOLD_DISK_USAGE_FACTOR=10.0
 MIN_PROXY_HOURS=24
+OUTPUT_FILES_PER_SUBDIR=0
 
 # We want explicit references to "app_rw" to be replaced with "app"
 # so the interactive osg app volume is not pounded by the jobs.
@@ -169,7 +170,7 @@ PrintUsage() {
   echo "  --extra-inputs=file1,file2,...  (e.g. parameter files)"
   echo "  --accounting-group=cms_name  (username to use for fair-sharing)"
   echo "  --requires-whole-machine (job should reserve all slots on machine)"
-  echo "  --output-files-per-subdir=N (0 for infinite; 500 default)"
+  echo "  --output-files-per-subdir=N (0 for infinite; $OUTPUT_FILES_PER_SUBDIR default)"
   echo "  --pre-hook=<exe>            (call <exe> before the job runs)"
   echo "  --post-hook=<exe>           (call <exe> after the job runs)"
   echo "  --no-shared-fs              (send analysis binaries to execute machine)"
@@ -195,7 +196,6 @@ CFG_EXTENSION=
 QUICK_TEST=
 EXTRA_INPUTS=
 REQUIRES_WHOLE_MACHINE=
-OUTPUT_FILES_PER_SUBDIR=500
 FARMOUT_HOOK_PRERUN=
 FARMOUT_HOOK_POSTRUN=
 NO_SHARED_FS=0
