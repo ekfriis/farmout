@@ -247,7 +247,8 @@ PrintUsage() {
   echo "  --rescue-dag-file=X"
   echo "  --output-dag-file=X"
   echo "  --last-submit-dir=X"
-  echo "  --no-shared-fs              (send analysis binaries to execute machine)"
+  echo "  --no-shared-fs              (the default: send analysis binaries to execute machine)"
+  echo "  --shared-fs                 (rely on CMSSW project area being on a shared fs (e.g. AFS))"
   echo "  --use-osg                   (allow jobs to run opportunistically on OSG)"
   echo "  --use-only-osg              (only run jobs opportunistically on OSG)"
   echo "  --debug"
@@ -256,7 +257,7 @@ PrintUsage() {
   exit 2
 }
 
-OPTS=`getopt -o "h" -l "help,output-dir:,input-dir:,submit-dir:,no-submit,job-count:,skip-existing-output,skip-existing-jobs,match-input-files:,exclude-input-files:,clean-crab-dupes,input-files-per-job:,disk-requirements:,memory-requirements:,input-file-list:,input-dbs-path:,input-runs:,save-failed-datafiles,save-missing-input-file-list:,assume-input-files-exist,site-requirements:,quick-test,extra-inputs:,accounting-group:,requires-whole-machine,fwklite,output-files-per-subdir:,job-generates-output-name,dbs-service-url:,infer-cmssw-path,lumi-mask:,express-queue,vsize-limit:,merge,use-hadd,rescue-dag-file:,output-dag-file:,last-submit-dir:,no-shared-fs,use-osg,use-only-osg,debug,resubmit-failed-jobs" -- "$@"`
+OPTS=`getopt -o "h" -l "help,output-dir:,input-dir:,submit-dir:,no-submit,job-count:,skip-existing-output,skip-existing-jobs,match-input-files:,exclude-input-files:,clean-crab-dupes,input-files-per-job:,disk-requirements:,memory-requirements:,input-file-list:,input-dbs-path:,input-runs:,save-failed-datafiles,save-missing-input-file-list:,assume-input-files-exist,site-requirements:,quick-test,extra-inputs:,accounting-group:,requires-whole-machine,fwklite,output-files-per-subdir:,job-generates-output-name,dbs-service-url:,infer-cmssw-path,lumi-mask:,express-queue,vsize-limit:,merge,use-hadd,rescue-dag-file:,output-dag-file:,last-submit-dir:,no-shared-fs,shared-fs,use-osg,use-only-osg,debug,resubmit-failed-jobs" -- "$@"`
 if [ $? -ne 0 ]; then PrintUsage; fi
 
 eval set -- "$OPTS"
@@ -296,7 +297,7 @@ LUMI_MASK=
 RESCUE_DAG_FILE=
 OUTPUT_DAG_FILE=
 LAST_SUBMIT_DIR=
-NO_SHARED_FS=0
+NO_SHARED_FS=1
 USE_OSG=0
 DEBUG=
 
@@ -344,6 +345,7 @@ do
     --output-dag-file) shift; OUTPUT_DAG_FILE="$1";;
     --last-submit-dir) shift; LAST_SUBMIT_DIR="$1";;
     --no-shared-fs) NO_SHARED_FS=1;;
+    --shared-fs) NO_SHARED_FS=0;;
     --use-osg) NO_SHARED_FS=1; USE_OSG=1;;
     --use-only-osg) NO_SHARED_FS=1; USE_OSG=1; SITE_REQUIREMENTS="${SITE_REQUIREMENTS} && TARGET.IS_GLIDEIN";;
     --debug) DEBUG=1;;

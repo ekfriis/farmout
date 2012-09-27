@@ -173,14 +173,15 @@ PrintUsage() {
   echo "  --output-files-per-subdir=N (0 for infinite; $OUTPUT_FILES_PER_SUBDIR default)"
   echo "  --pre-hook=<exe>            (call <exe> before the job runs)"
   echo "  --post-hook=<exe>           (call <exe> after the job runs)"
-  echo "  --no-shared-fs              (send analysis binaries to execute machine)"
+  echo "  --no-shared-fs              (the default: send analysis binaries to execute machine)"
+  echo "  --shared-fs                 (rely on CMSSW project area being on a shared fs (e.g. AFS))"
   echo "  --use-osg                   (allow jobs to run opportunistically on OSG)"
   echo "  --use-only-osg              (only run jobs opportunistically on OSG)"
   echo ""
   exit 2
 }
 
-OPTS=`getopt -o "h" -l "help,output-dir:,submit-dir:,no-submit,skip-existing-output,skip-existing-jobs,disk-requirements:,memory-requirements:,save-failed-datafiles,site-requirements:,quick-test,extra-inputs:,accounting-group:,requires-whole-machine,output-files-per-subdir:,vsize-limit:,pre-hook:,post-hook:,no-shared-fs,use-osg,use-only-osg" -- "$@"`
+OPTS=`getopt -o "h" -l "help,output-dir:,submit-dir:,no-submit,skip-existing-output,skip-existing-jobs,disk-requirements:,memory-requirements:,save-failed-datafiles,site-requirements:,quick-test,extra-inputs:,accounting-group:,requires-whole-machine,output-files-per-subdir:,vsize-limit:,pre-hook:,post-hook:,no-shared-fs,shared-fs,use-osg,use-only-osg" -- "$@"`
 if [ $? -ne 0 ]; then PrintUsage; fi
 
 eval set -- "$OPTS"
@@ -198,7 +199,7 @@ EXTRA_INPUTS=
 REQUIRES_WHOLE_MACHINE=
 FARMOUT_HOOK_PRERUN=
 FARMOUT_HOOK_POSTRUN=
-NO_SHARED_FS=0
+NO_SHARED_FS=1
 USE_OSG=0
 
 while [ ! -z "$1" ]
@@ -224,6 +225,7 @@ do
     --pre-hook) shift; FARMOUT_HOOK_PRERUN="$1";;
     --post-hook) shift; FARMOUT_HOOK_POSTRUN="$1";;
     --no-shared-fs) NO_SHARED_FS=1;;
+    --shared-fs) NO_SHARED_FS=0;;
     --use-osg) NO_SHARED_FS=1; USE_OSG=1;;
     --use-only-osg) NO_SHARED_FS=1; USE_OSG=1; SITE_REQUIREMENTS="${SITE_REQUIREMENTS} && TARGET.IS_GLIDEIN";;
     --) shift; break;;
