@@ -161,6 +161,11 @@ if [ "${CMS_DASHBOARD_REPORTER_TGZ}" != "" ]; then
 fi
 
 if [ "${DO_RUNTIME_CMSSW_SETUP}" = 1 ]; then
+    # if HOME is not defined, root fails to expand $HOME/.root.mimes
+    if [ "$HOME" = "" ]; then
+        export HOME=`pwd`
+    fi
+
     if ! [ -f "${VO_CMS_SW_DIR}/cmsset_default.sh" ]; then
         if [ -f "${OSG_APP}/cmssoft/cms/cmsset_default.sh" ]; then
             VO_CMS_SW_DIR="${OSG_APP}/cmssoft/cms/cmsset_default.sh"
