@@ -633,8 +633,10 @@ farmoutLogFile=$runDir/farmoutAnalysisJobs.log
 submitFile=$(incrfname "$submitFile")
 
 # If building a DAG, zero out the DAG input file if last-submit-dir is not
-# specified.
+# specified. Also check to make sure the dag file directory exists.
 if [ "$OUTPUT_DAG_FILE" != "" ]; then
+    DAGDIR=$(dirname $(realpath ${OUTPUT_DAG_FILE}))
+    mkdir -p $DAGDIR
     OUTPUT_DAG_FILE=$(realpath "${OUTPUT_DAG_FILE}")
     if [ "$LAST_SUBMIT_DIR" == "" ]; then
         echo -n >| "$OUTPUT_DAG_FILE"
