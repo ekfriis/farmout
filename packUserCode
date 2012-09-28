@@ -41,6 +41,7 @@ src_files="$(find -L src -maxdepth 3 -type d -name data)"
 
 # Note that while the python directory contains symlinks into src/, the "h" 
 # option to tar follows them as though they are regular files.
-tar chzf "$tgz" bin lib python $src_files || die "Failed to make $tgz"
+tar chzf "$tgz" bin lib python $src_files || die \
+  "Failed to pack working area into $tgz - The command was: "packUserCode $release_area $tgz""
 
 cd "$saved_wd" || die "Failed to access $saved_wd"

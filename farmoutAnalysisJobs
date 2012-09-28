@@ -635,7 +635,7 @@ submitFile=$(incrfname "$submitFile")
 # If building a DAG, zero out the DAG input file if last-submit-dir is not
 # specified. Also check to make sure the dag file directory exists.
 if [ "$OUTPUT_DAG_FILE" != "" ]; then
-    DAGDIR=$(dirname $(realpath ${OUTPUT_DAG_FILE}))
+    DAGDIR=$(dirname ${OUTPUT_DAG_FILE})
     mkdir -p $DAGDIR
     OUTPUT_DAG_FILE=$(realpath "${OUTPUT_DAG_FILE}")
     if [ "$LAST_SUBMIT_DIR" == "" ]; then
@@ -774,7 +774,8 @@ else
   fi
 
   cmssw_env="$cmssw_env CMSSW_USER_CODE_TGZ=$(basename $userCodeTgz)"
-  ${FARMOUT_HOME}/packUserCode "${CMSSW_HOME}" "$userCodeTgz"
+  ${FARMOUT_HOME}/packUserCode "${CMSSW_HOME}" "$userCodeTgz" || die \
+    "Farmout couldn't pack user code area.  Sorry."
   EXTRA_INPUTS="${EXTRA_INPUTS}${userCodeTgz}"
 
   if ! [ -z "${FARMOUT_DASHBOARD_REPORTER}" ]; then
