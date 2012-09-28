@@ -1,0 +1,46 @@
+#!/bin/bash
+#
+# Packs all the necessary binaries, libraries, and data from a CMSSW release 
+# area into a standalone area.
+#
+# Usage:
+#       packUserCode <CMSSW BASE> <output.tgz> 
+
+
+PrintUsage() {
+  echo "USAGE: packUserCode \$CMSSW_BASE output.tgz"
+  exit 2
+}
+
+MINARGS=2
+if [ $# -lt $MINARGS ]; then PrintUsage; fi
+
+logerror() {
+  echo 2>&1 "$@"
+}
+
+die() {
+  if [ $# -gt 0 ]; then
+    logerror
+    logerror "$@"
+  fi
+  exit 1
+}
+
+release_area="$1"
+tgz="$2"
+
+# Move to release area and pack things up.
+saved_wd="$(pwd)"
+cd "$release_area" || die "Failed to access $release_area"
+
+# Find data directories stored in working area.
+# Note the -L so we will respect packages symlinked into $CMSSW_BASE/src
+# The maxdepth 3 so we only tar things of the form: Package/SubPackage/data
+src_files="$(find -L src -maxdepth 3 -type d -name data)"
+
+# Note that while the python directory contains symlinks into src/, the "h" 
+# option to tar follows them as though they are regular files.
+tar chzf "$tgz" bin lib python $src_files || die "Failed to make $tgz"
+
+cd "$saved_wd" || die "Failed to access $saved_wd"

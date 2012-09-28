@@ -186,24 +186,6 @@ check_proxy() {
 
 }
 
-packUserCode() {
-  local release_area="$1"
-  local tgz="$2"
-
-  local saved_wd="$(pwd)"
-  cd "$release_area" || die "Failed to access $release_area"
-
-  # Include src/*/python directories, because python/ contains
-  # symlinks to to it that must remain symlinks, due to code that
-  # relies on its location within the src tree.
-  # Also include src/*/data, because these may be needed.
-  local src_files="$(find src -type d -name python -o -name data)"
-
-  tar czf "$tgz" bin lib python $src_files || die "Failed to make $tgz"
-
-  cd "$saved_wd" || die "Failed to access $saved_wd"
-}
-
 PrintUsage() {
   echo "USAGE: farmoutAnalysisJobs [options] <jobName> <CMSSW Path> <config file> [extra-cmsRun-args]"
   echo ""
@@ -790,7 +772,7 @@ else
   fi
 
   cmssw_env="$cmssw_env CMSSW_USER_CODE_TGZ=$(basename $userCodeTgz)"
-  packUserCode "${CMSSW_HOME}" "$userCodeTgz"
+  ${FARMOUT_HOME}/packUserCode "${CMSSW_HOME}" "$userCodeTgz"
   EXTRA_INPUTS="${EXTRA_INPUTS}${userCodeTgz}"
 
   if ! [ -z "${FARMOUT_DASHBOARD_REPORTER}" ]; then
