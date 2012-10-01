@@ -18,7 +18,12 @@ import sys
 import threading
 
 from itertools import chain
-from xml.etree.ElementTree import ElementTree
+
+# Prefer the bare metal version
+try:
+    from xml.etree.cElementTree import ElementTree
+except ImportError:
+    from xml.etree.ElementTree import ElementTree
 
 try:
     import RecoLuminosity.LumiDB.argparse as argparse
