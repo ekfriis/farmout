@@ -39,9 +39,13 @@ cd "$release_area" || die "Failed to access $release_area"
 # The maxdepth 3 so we only tar things of the form: Package/SubPackage/data
 src_files="$(find -L src -maxdepth 3 -type d -name data)"
 
+# Pick up python directories
+src_files="${src_files} $(find -L src -type d -name python)"
+echo $src_files
+
 # Note that while the python directory contains symlinks into src/, the "h" 
 # option to tar follows them as though they are regular files.
-tar chzf "$tgz" bin lib python $src_files || die \
+tar czf "$tgz" bin lib python $src_files || die \
   "Failed to pack working area into $tgz - The command was: "packUserCode $release_area $tgz""
 
 cd "$saved_wd" || die "Failed to access $saved_wd"
