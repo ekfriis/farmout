@@ -164,17 +164,18 @@ checkSharedFS() {
           fs la "$d" | grep -q 'system:anyuser rl'); then
        echo
        echo "WARNING: You are using --shared-fs, but $d"
-       echo "may not be readable from the worker nodes.  Ensure that all parent"
-       echo "directories and sub-directories of this path are readable without"
-       echo "an AFS token.  We recommend granting read access to the condor-hosts"
-       echo "group to achieve this.  Example:"
+       echo "may not be readable from the worker nodes.  Ensure that this directory"
+       echo "and all sub-directories are readable without an AFS token.  Also ensure"
+       echo "That parent directories are listable without an AFS token.  We recommend"
+       echo "using the condor-hosts group to achieve this.  Example:"
        echo
        d=$(realpath $CMSSW_HOME/..)
        h=$(realpath ~)
-       while [ "$d" != "/" ] && [ "$d" != "" ] && [ "$d" != "$h" ] && \
-             ! (fs la "$d" | grep -q 'condor-hosts rl' || \
-                fs la "$d" | grep -q 'system:anyuser rl'); do
-           echo fs setacl -dir $d -acl condor-hosts rl
+       while [ "$d" != "/" ] && [ "$d" != "" ] && [ "$d" != "$h" ]; do
+           if ! (fs la "$d" | grep -q 'condor-hosts r*l' || \
+                fs la "$d" | grep -q 'system:anyuser r*l'); then
+               echo fs setacl -dir $d -acl condor-hosts l
+           fi
            d=$(realpath $d/..)
        done
        echo "find $CMSSW_HOME -type d -exec fs setacl -dir '{}' -acl condor-hosts rl \;"
