@@ -157,6 +157,32 @@ find_dag_inputs() {
         sed -nre "s|^# DAG_OUTPUT_FILENAME (.*)|${DCAP_SERVER}\1|p"
 }
 
+checkSharedFS() {
+  local d=$1
+  if echo "$d" | grep -q ^/afs/; then
+    if ! (fs la "$d" | grep -q 'condor-hosts rl' || \
+          fs la "$d" | grep -q 'system:anyuser rl'); then
+       echo
+       echo "WARNING: You are using --shared-fs, but $d"
+       echo "may not be readable from the worker nodes.  Ensure that all parent"
+       echo "directories and sub-directories of this path are readable without"
+       echo "an AFS token.  We recommend granting read access to the condor-hosts"
+       echo "group to achieve this.  Example:"
+       echo
+       d=$(realpath $CMSSW_HOME/..)
+       h=$(realpath ~)
+       while [ "$d" != "/" ] && [ "$d" != "" ] && [ "$d" != "$h" ] && \
+             ! (fs la "$d" | grep -q 'condor-hosts rl' || \
+                fs la "$d" | grep -q 'system:anyuser rl'); do
+           echo fs setacl -dir $d -acl condor-hosts rl
+           d=$(realpath $d/..)
+       done
+       echo "find $CMSSW_HOME -type d -exec fs setacl -dir '{}' -acl condor-hosts rl \;"
+       echo
+    fi
+  fi
+}
+
 check_proxy() {
   hours=$1
   proxy=$2
@@ -767,6 +793,7 @@ if [ "$NO_SHARED_FS" != 1 ]; then
   requires_shared_fs="true"
   dboard="${dboard} CMS_DASHBOARD_REPORTER_TGZ=${CMS_DASHBOARD_REPORTER_TGZ}"
   dboard="${dboard} FARMOUT_DASHBOARD_REPORTER=${FARMOUT_DASHBOARD_REPORTER}"
+  checkSharedFS $CMSSW_HOME
 else
   do_getenv="false"
   requires_shared_fs="false"
