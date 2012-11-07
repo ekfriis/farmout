@@ -197,6 +197,14 @@ if [ "${DO_RUNTIME_CMSSW_SETUP}" = 1 ]; then
         fi
     fi
 
+    # Condor (as of 7.9.1) privsep fails if there are any private directories
+    # in the sandbox.  The job goes on hold after completing.  The hold reason
+    # is "error changing sandbox ownership to condor"
+    # See https://condor-wiki.cs.wisc.edu/index.cgi/tktview?tn=2904
+    # This problem happened when user code contained private directories.
+
+    find ${CMSSW_VERSION} -type d -exec chown a+rx '{}' \;
+
     cd ${CMSSW_VERSION}
 
     eval `$scram runtime -sh`
@@ -218,6 +226,7 @@ fi
 
 # create directory for intermediate output
 mkdir intermediate
+
 
 echo "Running on host `hostname`"
 echo "uname: " `uname -a`
