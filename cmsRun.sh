@@ -203,7 +203,7 @@ if [ "${DO_RUNTIME_CMSSW_SETUP}" = 1 ]; then
     # See https://condor-wiki.cs.wisc.edu/index.cgi/tktview?tn=2904
     # This problem happened when user code contained private directories.
 
-    find ${CMSSW_VERSION} -type d -exec chown a+rx '{}' \;
+    find ${CMSSW_VERSION} -type d -exec chmod a+rx '{}' \;
 
     cd ${CMSSW_VERSION}
 
