@@ -259,7 +259,8 @@ PrintUsage() {
   echo "                           (in <output-dir>-cmsRun-failed)"
   echo "  --save-missing-input-file-list=file"
   echo "  --assume-input-files-exist (do not check file existence at submit time)"
-  echo "  --quick-test             (require low latency scheduling)"
+  echo "  --express-queue-only     (require to run in the express queue)"
+  echo "  --express-queue          (allow to run in the express queue)"
   echo "  --extra-inputs=file1,file2,...  (e.g. parameter files)"
   echo "  --accounting-group=cms_name  (username to use for fair-sharing)"
   echo "  --requires-whole-machine (job should reserve all slots on machine)"
@@ -284,7 +285,7 @@ PrintUsage() {
   exit 2
 }
 
-OPTS=`getopt -o "h" -l "help,output-dir:,input-dir:,submit-dir:,no-submit,job-count:,skip-existing-output,skip-existing-jobs,match-input-files:,exclude-input-files:,clean-crab-dupes,input-files-per-job:,disk-requirements:,memory-requirements:,input-file-list:,input-dbs-path:,input-runs:,save-failed-datafiles,save-missing-input-file-list:,assume-input-files-exist,site-requirements:,quick-test,extra-inputs:,accounting-group:,requires-whole-machine,fwklite,output-files-per-subdir:,job-generates-output-name,dbs-service-url:,infer-cmssw-path,lumi-mask:,express-queue,vsize-limit:,merge,use-hadd,rescue-dag-file:,output-dag-file:,last-submit-dir:,no-shared-fs,shared-fs,use-osg,use-only-osg,debug,resubmit-failed-jobs" -- "$@"`
+OPTS=`getopt -o "h" -l "help,output-dir:,input-dir:,submit-dir:,no-submit,job-count:,skip-existing-output,skip-existing-jobs,match-input-files:,exclude-input-files:,clean-crab-dupes,input-files-per-job:,disk-requirements:,memory-requirements:,input-file-list:,input-dbs-path:,input-runs:,save-failed-datafiles,save-missing-input-file-list:,assume-input-files-exist,site-requirements:,quick-test,extra-inputs:,accounting-group:,requires-whole-machine,fwklite,output-files-per-subdir:,job-generates-output-name,dbs-service-url:,infer-cmssw-path,lumi-mask:,express-queue,express-queue-only,vsize-limit:,merge,use-hadd,rescue-dag-file:,output-dag-file:,last-submit-dir:,no-shared-fs,shared-fs,use-osg,use-only-osg,debug,resubmit-failed-jobs" -- "$@"`
 if [ $? -ne 0 ]; then PrintUsage; fi
 
 eval set -- "$OPTS"
@@ -356,6 +357,7 @@ do
     --assume-input-files-exist) ASSUME_INPUT_FILES_EXIST=0;;
     --site-requirements) shift; SITE_REQUIREMENTS="$1";;
     --quick-test) QUICK_TEST=1;;
+    --express-queue-only) QUICK_TEST=1;;
     --extra-inputs) shift; EXTRA_INPUTS="$1";;
     --accounting-group) shift; ACCOUNTING_GROUP="+AccountingGroup=\"$1\"";;
     --requires-whole-machine) REQUIRES_WHOLE_MACHINE=1;;
@@ -367,7 +369,7 @@ do
     --merge) MERGE=1;;
     --use-hadd) USE_HADD=1;;
     --infer-cmssw-path) INFER_CMSSW_PATH=1;;
-    --lumi-mask) shift; LUMI_MASK=`realpath $1`;;
+    --lumi-mask) shift; LUMI_MASK="$1";;
     --rescue-dag-file) shift; RESCUE_DAG_FILE="$1";;
     --output-dag-file) shift; OUTPUT_DAG_FILE="$1";;
     --last-submit-dir) shift; LAST_SUBMIT_DIR="$1";;

@@ -193,7 +193,7 @@ PrintUsage() {
   echo "  --site-requirements=$SITE_REQUIREMENTS"
   echo "  --save-failed-datafiles  (save root file from failed cmsRun job)"
   echo "                           (in <output-dir>-cmsRun-failed)"
-  echo "  --quick-test             (require low latency scheduling)"
+  echo "  --express-queue-only     (run in the express queue only)"
   echo "  --extra-inputs=file1,file2,...  (e.g. parameter files)"
   echo "  --accounting-group=cms_name  (username to use for fair-sharing)"
   echo "  --requires-whole-machine (job should reserve all slots on machine)"
@@ -208,7 +208,7 @@ PrintUsage() {
   exit 2
 }
 
-OPTS=`getopt -o "h" -l "help,output-dir:,submit-dir:,no-submit,skip-existing-output,skip-existing-jobs,disk-requirements:,memory-requirements:,save-failed-datafiles,site-requirements:,quick-test,extra-inputs:,accounting-group:,requires-whole-machine,output-files-per-subdir:,vsize-limit:,pre-hook:,post-hook:,no-shared-fs,shared-fs,use-osg,use-only-osg" -- "$@"`
+OPTS=`getopt -o "h" -l "help,output-dir:,submit-dir:,no-submit,skip-existing-output,skip-existing-jobs,disk-requirements:,memory-requirements:,save-failed-datafiles,site-requirements:,quick-test,express-queue-only,extra-inputs:,accounting-group:,requires-whole-machine,output-files-per-subdir:,vsize-limit:,pre-hook:,post-hook:,no-shared-fs,shared-fs,use-osg,use-only-osg" -- "$@"`
 if [ $? -ne 0 ]; then PrintUsage; fi
 
 eval set -- "$OPTS"
@@ -245,6 +245,7 @@ do
     --save-failed-datafiles) SAVE_FAILED_DATAFILES=1;;
     --site-requirements) shift; SITE_REQUIREMENTS="$1";;
     --quick-test) QUICK_TEST=1;;
+    --express-queue-only) QUICK_TEST=1;;
     --extra-inputs) shift; EXTRA_INPUTS="$1";;
     --accounting-group) shift; ACCOUNTING_GROUP="+AccountingGroup=\"$1\"";;
     --requires-whole-machine) REQUIRES_WHOLE_MACHINE=1;;
