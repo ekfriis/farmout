@@ -537,6 +537,7 @@ Environment          = "${dboard} ${save_failed_datafiles_env} ${vsize_env} ${cm
 Copy_To_Spool        = false
 Notification         = never
 WhenToTransferOutput = On_Exit
+ShouldTransferFiles  = yes
 on_exit_remove       = (ExitBySignal == FALSE && (ExitCode == 0 || ExitCode == ${FAIL_JOB} || NumJobStarts>3))
 ImageSize            = $(($MEMORY_REQUIREMENTS*1024))
 +DiskUsage           = $(($DISK_REQUIREMENTS*1024))
