@@ -197,13 +197,14 @@ if [ "${DO_RUNTIME_CMSSW_SETUP}" = 1 ]; then
         fi
     fi
 
-    # Condor (as of 7.9.1) privsep fails if there are any private directories
-    # in the sandbox.  The job goes on hold after completing.  The hold reason
-    # is "error changing sandbox ownership to condor"
-    # See https://condor-wiki.cs.wisc.edu/index.cgi/tktview?tn=2904
-    # This problem happened when user code contained private directories.
+    # Condor (as of 7.9.1) privsep fails if there are symlinks to
+    # private files or directories in the sandbox.  The job goes on
+    # hold after completing.  The hold reason is "error changing
+    # sandbox ownership to condor" See
+    # https://condor-wiki.cs.wisc.edu/index.cgi/tktview?tn=2904
 
     find ${CMSSW_VERSION} -type d -exec chmod a+rx '{}' \;
+    chmod -R a+r ${CMSSW_VERSION}
 
     cd ${CMSSW_VERSION}
 
