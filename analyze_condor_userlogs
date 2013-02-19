@@ -34,6 +34,16 @@ def AnalyzeLogs(logs):
 
 	print ulog_stats
 
+def JobIdToLog(job_id,logs):
+	for log in logs:
+		if os.system("grep -q '" + job_id + "' " + log) != 0:
+			continue
+		ulog = ULog.ReadCondorUserLog(log)
+		for event in ulog.events:
+			if event.job_id == job_id:
+				print log
+				return
+
 def PrintUsage():
 	sys.stderr.write("""
 USAGE: analyze_condor_userlogs [OPTIONS] <user_log_dir>
@@ -43,6 +53,7 @@ OPTIONS:
      (regular expression matching log files)
 --exclude-logs=((report)|(farmoutRandomSeedJobs)|(farmoutAnalysisJobs)).log
      (regular expression of matched files to ignore)
+--jobid-to-log=jobid
 
 """)
 
@@ -51,6 +62,7 @@ long_options = [
 	"match-logs=",
 	"exclude-logs=",
 	"ended-after=",
+	"jobid-to-log="
 ]
 
 options,args = getopt.getopt(sys.argv[1:],"h",long_options)
@@ -59,6 +71,7 @@ options,args = getopt.getopt(sys.argv[1:],"h",long_options)
 match_logs = re.compile(".*\\.log")
 exclude_logs = re.compile("((report)|(farmoutRandomSeedJobs)|(farmoutAnalysisJobs)).log")
 ended_after = None
+jobid_to_log = None
 
 for option,value in options:
 	if option == "-h" or option == "--help":
@@ -70,7 +83,12 @@ for option,value in options:
 		exclude_logs=re.compile(value)
 	if option == "--ended-after":
 		ended_after=long(value)
+	if option == "--jobid-to-log":
+		jobid_to_log = value
 
 logs = FindLogs(args,match_logs,exclude_logs,ended_after=ended_after)
 
-AnalyzeLogs(logs)
+if jobid_to_log:
+	JobIdToLog(jobid_to_log,logs)
+else:
+	AnalyzeLogs(logs)
