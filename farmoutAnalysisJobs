@@ -41,14 +41,23 @@ DCAP_HOME=${DCAP_SERVER}${PNFS_HOME}
 # We need wisc AFS for accessing user CMSSW release area unless in no-shared-fs mode
 SITE_REQUIREMENTS='TARGET.Arch == "X86_64" && (MY.RequiresSharedFS=!=true || TARGET.HasAFS_OSG) && (TARGET.OSG_major =!= undefined || TARGET.IS_GLIDEIN=?=true) && IsSlowSlot=!=true'
 
-if echo "$PATH" | grep -q /cvmfs/cms.hep.wisc.edu; then
+##
+## cms.cern.ch depends on the cms.hep.wisc.edu CVMFS respository for NOW (02-19-2013)
+## SITECONF is the reason for the dependency
+
+if echo "$PATH" | egrep -q "(/cvmfs/cms.hep.wisc.edu)|(/cvmfs/cms.cern.ch)" ; then
   # require cvmfs to be available and at least as up to date as the local cvmfs
 
-  SITE_REQUIREMENTS="${SITE_REQUIREMENTS} && (TARGET.HasParrotCVMFS=?=true || (TARGET.UWCMS_CVMFS_Exists"
+  SITE_REQUIREMENTS="${SITE_REQUIREMENTS} && (TARGET.HasParrotCVMFS=?=true || (TARGET.UWCMS_CVMFS_Exists  && TARGET.CMS_CVMFS_Exists"
 
   local_cvmfs_revision=`attr -q -g revision /cvmfs/cms.hep.wisc.edu`
   if [ "$local_cvmfs_revision" != "" ]; then
     SITE_REQUIREMENTS="${SITE_REQUIREMENTS} && TARGET.UWCMS_CVMFS_Revision >= ${local_cvmfs_revision}"
+  fi
+
+  local_cvmfs_revision=`attr -q -g revision /cvmfs/cms.cern.ch`
+  if [ "$local_cvmfs_revision" != "" ]; then
+    SITE_REQUIREMENTS="${SITE_REQUIREMENTS} && TARGET.CMS_CVMFS_Revision >= ${local_cvmfs_revision}"
   fi
 
   SITE_REQUIREMENTS="${SITE_REQUIREMENTS} ))"
