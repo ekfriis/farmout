@@ -175,7 +175,7 @@ checkSharedFS() {
        echo "WARNING: You are using --shared-fs, but $d"
        echo "may not be readable from the worker nodes.  Ensure that this directory"
        echo "and all sub-directories are readable without an AFS token.  Also ensure"
-       echo "That parent directories are listable without an AFS token.  We recommend"
+       echo "that parent directories are listable without an AFS token.  We recommend"
        echo "using the condor-hosts group to achieve this.  Example:"
        echo
        d=$(realpath $CMSSW_HOME/..)
@@ -270,13 +270,14 @@ PrintUsage() {
   echo "  --shared-fs                 (rely on CMSSW project area being on a shared fs (e.g. AFS))"
   echo "  --use-osg                   (allow jobs to run opportunistically on OSG)"
   echo "  --use-only-osg              (only run jobs opportunistically on OSG)"
+  echo "  --use-hdfs                  (read files from /hdfs)"
   echo "  --debug"
   echo ""
   echo "Note that <runName> is taken from the name of the config file."
   exit 2
 }
 
-OPTS=`getopt -o "h" -l "help,output-dir:,input-dir:,submit-dir:,no-submit,job-count:,skip-existing-output,skip-existing-jobs,match-input-files:,exclude-input-files:,clean-crab-dupes,input-files-per-job:,disk-requirements:,memory-requirements:,input-file-list:,input-dbs-path:,input-runs:,save-failed-datafiles,save-missing-input-file-list:,assume-input-files-exist,site-requirements:,quick-test,extra-inputs:,accounting-group:,requires-whole-machine,fwklite,output-files-per-subdir:,job-generates-output-name,dbs-service-url:,infer-cmssw-path,lumi-mask:,express-queue,express-queue-only,vsize-limit:,merge,use-hadd,rescue-dag-file:,output-dag-file:,last-submit-dir:,no-shared-fs,shared-fs,use-osg,use-only-osg,debug,resubmit-failed-jobs" -- "$@"`
+OPTS=`getopt -o "h" -l "help,output-dir:,input-dir:,submit-dir:,no-submit,job-count:,skip-existing-output,skip-existing-jobs,match-input-files:,exclude-input-files:,clean-crab-dupes,input-files-per-job:,disk-requirements:,memory-requirements:,input-file-list:,input-dbs-path:,input-runs:,save-failed-datafiles,save-missing-input-file-list:,assume-input-files-exist,site-requirements:,quick-test,extra-inputs:,accounting-group:,requires-whole-machine,fwklite,output-files-per-subdir:,job-generates-output-name,dbs-service-url:,infer-cmssw-path,lumi-mask:,express-queue,express-queue-only,vsize-limit:,merge,use-hadd,rescue-dag-file:,output-dag-file:,last-submit-dir:,no-shared-fs,shared-fs,use-osg,use-only-osg,use-hdfs,debug,resubmit-failed-jobs" -- "$@"`
 if [ $? -ne 0 ]; then PrintUsage; fi
 
 eval set -- "$OPTS"
@@ -318,6 +319,7 @@ OUTPUT_DAG_FILE=
 LAST_SUBMIT_DIR=
 NO_SHARED_FS=1
 USE_OSG=0
+USE_HDFS=0
 DEBUG=
 
 while [ ! -z "$1" ]
@@ -369,22 +371,11 @@ do
     --use-osg) NO_SHARED_FS=1; USE_OSG=1;;
     --use-only-osg) NO_SHARED_FS=1; USE_OSG=1; SITE_REQUIREMENTS="${SITE_REQUIREMENTS} && TARGET.IS_GLIDEIN";;
     --debug) DEBUG=1;;
-#    --use-hdfs)
-#        SRM_SERVER=srm://cmshdfs01.hep.wisc.edu:8443/srm/v2/server?SFN=
-#        PNFS_HOME=/hdfs/store/user/${FARMOUT_USER}
-#        DCAP_SERVER=
-#        PNFS_STORE=/hdfs
-#        SRM_HOME=${SRM_SERVER}${PNFS_HOME}
-#        DCAP_HOME=${DCAP_SERVER}${PNFS_HOME}
-#
-#	# The following is required for CMSSW < 6.9.0, because
-#	# we rely on fallback to xrootd when /hdfs is not there,
-#	# and support for fallback was added in 6.9.0.
-#	# TODO: check what version of CMSSW is being used and only
-#	# apply this when needed.  Also, find a better way of testing
-#	# for /hdfs.
-#	SITE_REQUIREMENTS="${SITE_REQUIREMENTS} && TARGET.UidDomain == \"hep.wisc.edu\""
-#        ;;
+    --use-hdfs)
+        USE_HDFS=1
+        DCAP_SERVER=file:/hdfs/
+	SITE_REQUIREMENTS="${SITE_REQUIREMENTS} && TARGET.HAS_CMS_HDFS"
+        ;;
     --) shift; break;;
     *) die "Unexpected option $1";;
   esac
@@ -568,8 +559,19 @@ OUTPUT_DIR=${OUTPUT_DIR:-${SRM_HOME}/$jobName-$runName}
 INPUT_DIR=${INPUT_DIR:-${DCAP_HOME}/$jobName}
 SUBMIT_DIR=${SUBMIT_DIR:-${SUBMIT_HOME}/$jobName-$runName}
 
+if [ "$USE_HDFS" = 1 ]; then
+    if [ "${INPUT_DIR#file:/hdfs/}" = "${INPUT_DIR}" ]; then
+        die "You specified --use-hdfs.  In this case, the input directory must begin with file:/hdfs/"
+    fi
+    if [ "$USE_OSG" = 1 ]; then
+        die "You cannot use --use-hdfs and --use-osg together."
+    fi
+fi
+
 #Strip off server part of input path
 LOCAL_INPUT_DIR=${INPUT_DIR#$DCAP_SERVER}
+#Also allow URLs of the form file:/hdfs/...
+LOCAL_INPUT_DIR=${INPUT_DIR#file:/hdfs/}
 
 #Get the part of INPUT_DIR that was stripped off and make sure INPUT_BASE ends
 #with a trailing slash. If we're building a DAG, we don't need INPUT_BASE at
@@ -587,6 +589,10 @@ fi
 
 if [ -d "${LOCAL_POSIX_PREFIX}${LOCAL_INPUT_DIR}" ]; then
     LOCAL_INPUT_DIR="${LOCAL_POSIX_PREFIX}${LOCAL_INPUT_DIR}"
+fi
+
+if [ -d "${LOCAL_POSIX_PREFIX}/${LOCAL_INPUT_DIR}" ]; then
+    LOCAL_INPUT_DIR="${LOCAL_POSIX_PREFIX}/${LOCAL_INPUT_DIR}"
 fi
 
 if [ "$INPUT_FILE_LIST" != "" ]; then
