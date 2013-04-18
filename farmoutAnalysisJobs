@@ -570,8 +570,6 @@ fi
 
 #Strip off server part of input path
 LOCAL_INPUT_DIR=${INPUT_DIR#$DCAP_SERVER}
-#Also allow URLs of the form file:/hdfs/...
-LOCAL_INPUT_DIR=${INPUT_DIR#file:/hdfs/}
 
 #Get the part of INPUT_DIR that was stripped off and make sure INPUT_BASE ends
 #with a trailing slash. If we're building a DAG, we don't need INPUT_BASE at
