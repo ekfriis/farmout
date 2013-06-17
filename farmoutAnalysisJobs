@@ -26,6 +26,7 @@ FARMOUT_HOME=${FARMOUT_HOME:-$(dirname $(realpath $0))}
 FARMOUT_USER=${FARMOUT_USER:-${USER}}
 SRM_SERVER=srm://cmssrm.hep.wisc.edu:8443/srm/v2/server?SFN=/hdfs
 PNFS_HOME=/store/user/${FARMOUT_USER}
+CMS_DASHBOARD_LOCAL_CE=cmsgrid02.hep.wisc.edu
 
 LOCAL_POSIX_PREFIX=/hdfs
 
