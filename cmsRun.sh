@@ -330,6 +330,10 @@ export dboard_CrabSysCpuTime=$sys_time
 # remove vsize limit so it does not interfere with file transfer
 ulimit -S -v unlimited 2>&1
 
+# get rid of CMSSW environment, because it can cause incompatibilities
+# with libraries required by lcg-cp
+eval `scram runtime unsetenv -sh`
+
 if [ "$cmsRun_rc" != "0" ]; then
   echo "$cmsRun exited with status $cmsRun_rc"
   if [ -f $datafile ] && [ "$SAVE_FAILED_DATAFILES" = "1" ] && [ "$SRM_OUTPUT_DIR" != "" ]; then
