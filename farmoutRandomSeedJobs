@@ -549,10 +549,10 @@ Notification         = never
 WhenToTransferOutput = On_Exit
 ShouldTransferFiles  = yes
 on_exit_remove       = (ExitBySignal == FALSE && (ExitCode == 0 || ExitCode == ${FAIL_JOB} || NumJobStarts>3))
-ImageSize            = $(($MEMORY_REQUIREMENTS*1024))
-+DiskUsage           = $(($DISK_REQUIREMENTS*1024))
+request_memory       = ${MEMORY_REQUIREMENTS}
+request_disk         = $(($DISK_REQUIREMENTS*1024))
 ${IS_FAST_QUEUE_JOB}
-Requirements         = ${SITE_REQUIREMENTS} && TARGET.Memory > ${MEMORY_REQUIREMENTS}
+Requirements         = ${SITE_REQUIREMENTS}
 # stop jobs from running if they blow up
 # 2012-11-20: disabled the following periodic_hold, because a bug in a pre-release of 7.9.2
 # causes DiskUsage to blow up
