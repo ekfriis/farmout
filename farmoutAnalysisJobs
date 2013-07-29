@@ -855,9 +855,7 @@ request_memory       = ${MEMORY_REQUIREMENTS}
 request_disk         = $(($DISK_REQUIREMENTS*1024))
 Requirements         = ${SITE_REQUIREMENTS}
 # stop jobs from running if they blow up
-# 2012-11-20: disabled the following periodic_hold, because a bug in a pre-release of 7.9.2
-# causes DiskUsage to blow up
-#periodic_hold        = DiskUsage/1024 > ${HOLD_DISK_USAGE_FACTOR}*${DISK_REQUIREMENTS}
+periodic_hold        = DiskUsage/1024 > ${HOLD_DISK_USAGE_FACTOR}*${DISK_REQUIREMENTS}
 job_ad_information_attrs = MachineAttrGLIDEIN_Site0,MachineAttrName0
 ${ACCOUNTING_GROUP}
 ${REQUIRES_WHOLE_MACHINE_ATTR}
