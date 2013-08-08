@@ -388,6 +388,11 @@ if [ -n "${DEBUG}" ]; then
     set -x
 fi
 
+if [ "${MERGE}" = 1 ] && [ "${VSIZE_LIMIT}" -lt 6000 ]; then
+    echo "Increasing vsize limit from ${VSIZE_LIMIT} MB to 6000 MB"
+    VSIZE_LIMIT=6000
+fi
+
 if [ "$SKIP_EXISTING_OUTPUT" = "1" ] && [ "$JOB_GENERATES_OUTPUT_NAME" = "1" ];
 then
   die "The option --job-generates-output-name conflicts with --skip-existing-output"
