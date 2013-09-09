@@ -266,6 +266,9 @@ PrintUsage() {
   echo "  --dbs-service-url=X         (global DBS by default)"
   echo "  --rescue-dag-file=X"
   echo "  --output-dag-file=X"
+  echo "  --merge-output=LAYERS       (merge final output files [requires --output-dag-file])"
+  echo "                              (the merge proceeds in LAYERS steps)"
+  echo "                              (output appears as ${SRM_HOME}/<jobName>-<runName>-merged.root)"
   echo "  --last-submit-dir=X"
   echo "  --no-shared-fs              (the default: send analysis binaries to execute machine)"
   echo "  --shared-fs                 (rely on CMSSW project area being on a shared fs (e.g. AFS))"
@@ -278,7 +281,7 @@ PrintUsage() {
   exit 2
 }
 
-OPTS=`getopt -o "h" -l "help,output-dir:,input-dir:,submit-dir:,no-submit,job-count:,skip-existing-output,skip-existing-jobs,match-input-files:,exclude-input-files:,clean-crab-dupes,input-files-per-job:,disk-requirements:,memory-requirements:,input-file-list:,input-dbs-path:,input-runs:,save-failed-datafiles,save-missing-input-file-list:,assume-input-files-exist,site-requirements:,quick-test,extra-inputs:,accounting-group:,requires-whole-machine,fwklite,output-files-per-subdir:,job-generates-output-name,dbs-service-url:,infer-cmssw-path,lumi-mask:,express-queue,express-queue-only,vsize-limit:,merge,use-hadd,rescue-dag-file:,output-dag-file:,last-submit-dir:,no-shared-fs,shared-fs,use-osg,use-only-osg,use-hdfs,debug,resubmit-failed-jobs" -- "$@"`
+OPTS=`getopt -o "h" -l "help,output-dir:,input-dir:,submit-dir:,no-submit,job-count:,skip-existing-output,skip-existing-jobs,match-input-files:,exclude-input-files:,clean-crab-dupes,input-files-per-job:,disk-requirements:,memory-requirements:,input-file-list:,input-dbs-path:,input-runs:,save-failed-datafiles,save-missing-input-file-list:,assume-input-files-exist,site-requirements:,quick-test,extra-inputs:,accounting-group:,requires-whole-machine,fwklite,output-files-per-subdir:,job-generates-output-name,dbs-service-url:,infer-cmssw-path,lumi-mask:,express-queue,express-queue-only,vsize-limit:,merge,use-hadd,rescue-dag-file:,output-dag-file:,merge-output:,last-submit-dir:,no-shared-fs,shared-fs,use-osg,use-only-osg,use-hdfs,debug,resubmit-failed-jobs" -- "$@"`
 if [ $? -ne 0 ]; then PrintUsage; fi
 
 eval set -- "$OPTS"
@@ -317,6 +320,7 @@ INFER_CMSSW_PATH=0
 LUMI_MASK=
 RESCUE_DAG_FILE=
 OUTPUT_DAG_FILE=
+MERGE_OUTPUT=-1
 LAST_SUBMIT_DIR=
 NO_SHARED_FS=1
 USE_OSG=0
@@ -366,6 +370,7 @@ do
     --lumi-mask) shift; LUMI_MASK="$1";;
     --rescue-dag-file) shift; RESCUE_DAG_FILE="$1";;
     --output-dag-file) shift; OUTPUT_DAG_FILE="$1";;
+    --merge-output) shift; MERGE_OUTPUT="$1";;
     --last-submit-dir) shift; LAST_SUBMIT_DIR="$1";;
     --no-shared-fs) NO_SHARED_FS=1;;
     --shared-fs) NO_SHARED_FS=0;;
@@ -416,6 +421,10 @@ fi
 
 if [ "$MERGE" != "1" ] && [ "$USE_HADD" = "1" ]; then
   die "The option --use-hadd requires --merge"
+fi
+
+if [ "$MERGE_OUTPUT" != "-1" ] && [ "$OUTPUT_DAG_FILE" = "" ]; then
+  die "The option --merge-output requires an --output-dag-file"
 fi
 
 if [ "$USE_OSG" = "1" ]; then
