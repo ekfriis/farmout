@@ -1024,6 +1024,8 @@ do
       jobcfg=$jobtag.$CFG_EXTENSION
     fi
     outputFileName=$jobtag.root
+    #  Keep track of the output files we will create
+    echo $job_output_dir/$outputFileName >> $runDir/outputfiles.txt
     inputfiles="$jobcfg"
     if [ "$EXTRA_INPUTS" != "" ]; then
       inputfiles="$jobcfg,$EXTRA_INPUTS"
