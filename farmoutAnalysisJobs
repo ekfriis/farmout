@@ -510,7 +510,13 @@ if [ "$MERGE" = "1" ]; then
   fi
 
 else
+  if [ ! -f $1 ]; then
+      die "Can not find config template/script at $1"
+  fi
   configTemplate=`realpath $1`
+  if [ ! -f $configTemplate ]; then
+      die "Could not expand the real path of config template/script at $1"
+  fi
   shift
 
   # get extra arguments in condor arg syntax
