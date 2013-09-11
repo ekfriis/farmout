@@ -282,6 +282,7 @@ for cfg in ${jobcfgs//,/ }; do
     export INPUT="$cfg"
     export OUTPUT="$datafile"
     echo "farmout: starting $cmsRun with INPUT=$INPUT and OUTPUT=$OUTPUT at `date`"
+    echo "and arguments: $@"
 
     /usr/bin/time -p -o exe_time $cmsRun "$@"
     cmsRun_rc=$?
