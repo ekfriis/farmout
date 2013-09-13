@@ -3,7 +3,7 @@
 # This script is intended to be run by farmout's cmsRun.sh in "fwklite" mode.
 # It runs on the worker node and merges root files into one file.
 
-if [ -z "${INPUT}" ] || [ -z "${OUTPUT}"; then
+if [ -z "${INPUT}" ] || [ -z "${OUTPUT}" ]; then
   echo "Expected INPUT and OUTPUT to be defined in the environment." 1>&2
   exit 2
 fi
