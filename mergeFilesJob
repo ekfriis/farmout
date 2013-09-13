@@ -13,15 +13,4 @@ if ! [ -f "${INPUT}" ]; then
   exit 1
 fi
 
-if ! [ -z "$USE_HADD" ]; then
-  exec hadd "${OUTPUT}" `cat ${INPUT}`
-else
-
-  if ! [ -f mergeFiles.C ]; then
-    echo "Cannot find required file mergeFiles.C" 1>&2
-    exit 1
-  fi
-
-  exec root -q -b "mergeFiles.C(\"${OUTPUT}\",\"list-in-file:${INPUT}\")"
-fi
-
+exec hadd "${OUTPUT}" `cat ${INPUT}`
